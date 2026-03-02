@@ -1,0 +1,33 @@
+<?php
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        $a = $_POST["a"];
+        $b = $_POST["b"];
+
+        if ($b != 0) {
+            $resultado = $a / $b;
+        } else {
+            $resultado = "Erro: divisão por zero";
+        }
+    }
+?>
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1><?php echo 'Calculadora de Divisão'; ?></h1>
+
+<form method='POST' action='divisao.php'>
+    a:<input type=text name='a'><br>
+    b:<input type=text name='b'><br>
+    <input type=submit value='Dividir'>
+</form>
+
+<br>
+<?php
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        echo 'Resultado: ' . $resultado;
+    }
+?>
+
+</body>
+</html>
