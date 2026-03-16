@@ -1,0 +1,40 @@
+<?php
+$msg = "";
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $matricula = $_POST['matricula'];
+    $nome = $_POST['nome'];
+    $email = $_POST['email'];
+
+    if ($matricula == "" || $nome == "" || $email == "") {
+        $msg = "Erro: preencha todos os campos!";
+    } else {
+        $arquivo = "alunos.txt";
+        $dados = $matricula . ";" . $nome . ";" . $email . "\n";
+        file_put_contents($arquivo, $dados, FILE_APPEND);
+        $msg = "Aluno cadastrado com sucesso!";
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Cadastro de Aluno</title>
+</head>
+<body>
+
+<h2>Cadastro de Aluno</h2>
+
+<form method="post">
+    Matrícula: <input type="text" name="matricula"><br><br>
+    Nome: <input type="text" name="nome"><br><br>
+    Email: <input type="text" name="email"><br><br>
+    <input type="submit" value="Cadastrar">
+</form>
+
+<p><?php echo $msg; ?></p>
+
+</body>
+</html>
