@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Cadastrar Usuário</h2>
+<form method="post">
+Nome: <input type="text" name="nome" required><br><br>
+Email: <input type="email" name="email" required><br><br>
+Senha: <input type="password" name="senha" required><br><br>
+<input type="submit" name="cadastrar_usuario" value="Cadastrar Usuário">
+</form>
+
+<?php
+$arquivoUsuarios = "usuarios.txt";
+
+if (isset($_POST["cadastrar_usuario"])) {
+    $nome = $_POST["nome"]; $email = $_POST["email"]; $senha = $_POST["senha"];
+    file_put_contents($arquivoUsuarios, "$nome;$email;$senha\n", FILE_APPEND);
+}
+
+if (file_exists($arquivoUsuarios)) {
+    $linhas = file($arquivoUsuarios);
+    foreach ($linhas as $i => $linha) {
+        $d = explode(";", $linha);
+        echo "Nome: $d[0] | Email: $d[1] ";
+        echo "<a href='?excluir_usuario=$i'>Excluir</a><br>";
+    }
+}
+
+if (isset($_GET["excluir_usuario"])) {
+    $linhas = file($arquivoUsuarios);
+    unset($linhas[$_GET["excluir_usuario"]]);
+    file_put_contents($arquivoUsuarios, $linhas);
+    header("Location: sistema.php");
+}
+?>
+
+<hr>
+
+<h2>Cadastrar Pergunta de Múltipla Escolha</h2>
+<form method="post">
+Pergunta:<br><input type="text" name="pergunta" required><br><br>
+A: <input type="text" name="a" required><br>
+B: <input type="text" name="b" required><br>
+C: <input type="text" name="c" required><br>
+D: <input type="text" name="d" required><br><br>
+<select name="correta">
+<option>A</option><option>B</option><option>C</option><option>D</option>
+</select><br><br>
+<input type="submit" name="cadastrar_pergunta" value="Cadastrar Pergunta">
+</form>
+
+<?php
+$arquivoPerguntas = "perguntas_multipla.txt";
+
+if (isset($_POST["cadastrar_pergunta"])) {
+    $pergunta = $_POST["pergunta"]; $a = $_POST["a"]; $b = $_POST["b"];
+    $c = $_POST["c"]; $d = $_POST["d"]; $correta = $_POST["correta"];
+    file_put_contents($arquivoPerguntas, "$pergunta;$a;$b;$c;$d;$correta\n", FILE_APPEND);
+}
+
+if (file_exists($arquivoPerguntas)) {
+    $linhas = file($arquivoPerguntas);
+    foreach ($linhas as $i => $linha) {
+        $d = explode(";", $linha);
+        echo "<b>$d[0]</b><br>";
+        echo "A) $d[1]<br>B) $d[2]<br>C) $d[3]<br>D) $d[4]<br>";
+        echo "Correta: $d[5] <a href='?excluir_pergunta=$i'>Excluir</a><hr>";
+    }
+}
+
+if (isset($_GET["excluir_pergunta"])) {
+    $linhas = file($arquivoPerguntas);
+    unset($linhas[$_GET["excluir_pergunta"]]);
+    file_put_contents($arquivoPerguntas, $linhas);
+    header("Location: sistema.php");
+}
+?>
+
+</body>
+</html>
