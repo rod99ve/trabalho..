@@ -1,0 +1,104 @@
+<h2>Cadastrar Pergunta de Texto</h2>
+<form method="post">
+Pergunta:<br>
+<input type="text" name="pergunta_texto" required><br><br>
+Resposta:<br>
+<textarea name="resposta_texto" required></textarea><br><br>
+<input type="submit" name="cadastrar_texto" value="Cadastrar Pergunta Texto">
+</form>
+
+<?php
+$arquivoMultipla = "perguntas_multipla.txt";
+$arquivoTexto = "perguntas_texto.txt";
+
+if (isset($_POST["cadastrar_texto"])) {
+    $p = $_POST["pergunta_texto"];
+    $r = $_POST["resposta_texto"];
+    file_put_contents($arquivoTexto, "$p;$r\n", FILE_APPEND);
+}
+
+if (isset($_GET["editar_multipla"])) {
+    $linhas = file($arquivoMultipla);
+    $d = explode(";", $linhas[$_GET["editar_multipla"]]);
+?>
+<form method="post">
+<input type="hidden" name="id" value="<?= $_GET["editar_multipla"] ?>">
+Pergunta: <input type="text" name="pergunta" value="<?= $d[0] ?>"><br>
+A: <input type="text" name="a" value="<?= $d[1] ?>"><br>
+B: <input type="text" name="b" value="<?= $d[2] ?>"><br>
+C: <input type="text" name="c" value="<?= $d[3] ?>"><br>
+D: <input type="text" name="d" value="<?= $d[4] ?>"><br>
+<select name="correta">
+<option <?= $d[5]=="A"?"selected":"" ?>>A</option>
+<option <?= $d[5]=="B"?"selected":"" ?>>B</option>
+<option <?= $d[5]=="C"?"selected":"" ?>>C</option>
+<option <?= $d[5]=="D"?"selected":"" ?>>D</option>
+</select><br><br>
+<input type="submit" name="salvar_multipla" value="Salvar Alteração">
+</form>
+<?php }
+
+if (isset($_POST["salvar_multipla"])) {
+    $linhas = file($arquivoMultipla);
+    $id = $_POST["id"];
+    $linhas[$id] = $_POST["pergunta"].";".$_POST["a"].";".$_POST["b"].";".$_POST["c"].";".$_POST["d"].";".$_POST["correta"]."\n";
+    file_put_contents($arquivoMultipla, $linhas);
+    header("Location: sistema.php");
+}
+
+if (isset($_GET["editar_texto"])) {
+    $linhas = file($arquivoTexto);
+    $d = explode(";", $linhas[$_GET["editar_texto"]]);
+?>
+<form method="post">
+<input type="hidden" name="id" value="<?= $_GET["editar_texto"] ?>">
+Pergunta: <input type="text" name="pergunta" value="<?= $d[0] ?>"><br>
+Resposta:<br>
+<textarea name="resposta"><?= $d[1] ?></textarea><br>
+<input type="submit" name="salvar_texto" value="Salvar Alteração">
+</form>
+<?php }
+
+if (isset($_POST["salvar_texto"])) {
+    $linhas = file($arquivoTexto);
+    $linhas[$_POST["id"]] = $_POST["pergunta"].";".$_POST["resposta"]."\n";
+    file_put_contents($arquivoTexto, $linhas);
+    header("Location: sistema.php");
+}
+?>
+
+<h2>Lista de Perguntas</h2>
+
+<h3>Múltipla Escolha</h3>
+<?php
+if (file_exists($arquivoMultipla)) {
+    foreach (file($arquivoMultipla) as $i => $l) {
+        $d = explode(";", $l);
+        echo "<b>$d[0]</b> 
+        <a href='?ver_multipla=$i'>Ver</a> |
+        <a href='?editar_multipla=$i'>Editar</a> |
+        <a href='?excluir_multipla=$i'>Excluir</a><br>";
+    }
+}
+
+if (isset($_GET["ver_multipla"])) {
+    $d = explode(";", file($arquivoMultipla)[$_GET["ver_multipla"]]);
+    echo "<h3>$d[0]</h3>
+    A) $d[1]<br>B) $d[2]<br>C) $d[3]<br>D) $d[4]<br>
+    Correta: $d[5]";
+}
+
+if (isset($_GET["excluir_multipla"])) {
+    $l = file($arquivoMultipla);
+    unset($l[$_GET["excluir_multipla"]]);
+    file_put_contents($arquivoMultipla, $l);
+    header("Location: sistema.php");
+}
+
+if (isset($_GET["excluir_texto"])) {
+    $l = file($arquivoTexto);
+    unset($l[$_GET["excluir_texto"]]);
+    file_put_contents($arquivoTexto, $l);
+    header("Location: sistema.php");
+}
+?>
