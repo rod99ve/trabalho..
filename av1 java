@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<body>
+
+<h2>Cadastrar Usuário</h2>
+<input id="nome" placeholder="Nome"><br><br>
+<input id="email" placeholder="Email"><br><br>
+<input id="senha" type="password" placeholder="Senha"><br><br>
+<button onclick="cadastrarUsuario()">Cadastrar</button>
+
+<div id="usuarios"></div>
+
+<hr>
+
+<h2>Cadastrar Pergunta Múltipla</h2>
+<input id="p" placeholder="Pergunta"><br>
+<input id="a" placeholder="A"><br>
+<input id="b" placeholder="B"><br>
+<input id="c" placeholder="C"><br>
+<input id="d" placeholder="D"><br>
+<select id="correta">
+<option>A</option><option>B</option><option>C</option><option>D</option>
+</select><br><br>
+<button onclick="cadastrarMultipla()">Cadastrar</button>
+
+<div id="multipla"></div>
+
+<hr>
+
+<h2>Cadastrar Pergunta Texto</h2>
+<input id="pt" placeholder="Pergunta"><br><br>
+<textarea id="rt"></textarea><br><br>
+<button onclick="cadastrarTexto()">Cadastrar</button>
+
+<div id="texto"></div>
+
+<script>
+function cadastrarUsuario(){
+fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({acao:"cu",n:nome.value,e:email.value,s:senha.value})})
+.then(()=>listarUsuarios())
+}
+
+function listarUsuarios(){
+fetch("api.php?acao=lu").then(r=>r.json()).then(d=>{
+usuarios.innerHTML=""
+d.forEach((u,i)=>{
+usuarios.innerHTML+=`${u.n} | ${u.e} <button onclick="excluirUsuario(${i})">X</button><br>`
+})
+})
+}
+
+function excluirUsuario(i){
+fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({acao:"eu",i:i})}).then(()=>listarUsuarios())
+}
+
+function cadastrarMultipla(){
+fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({acao:"cm",p:p.value,a:a.value,b:b.value,c:c.value,d:d.value,co:correta.value})})
+.then(()=>listarMultipla())
+}
+
+function listarMultipla(){
+fetch("api.php?acao=lm").then(r=>r.json()).then(d=>{
+multipla.innerHTML=""
+d.forEach((q,i)=>{
+multipla.innerHTML+=`${q.p} <button onclick="excluirMultipla(${i})">X</button><br>`
+})
+})
+}
+
+function excluirMultipla(i){
+fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({acao:"em",i:i})}).then(()=>listarMultipla())
+}
+
+function cadastrarTexto(){
+fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({acao:"ct",p:pt.value,r:rt.value})})
+.then(()=>listarTexto())
+}
+
+function listarTexto(){
+fetch("api.php?acao=lt").then(r=>r.json()).then(d=>{
+texto.innerHTML=""
+d.forEach((q,i)=>{
+texto.innerHTML+=`${q.p} <button onclick="excluirTexto(${i})">X</button><br>`
+})
+})
+}
+
+function excluirTexto(i){
+fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({acao:"et",i:i})}).then(()=>listarTexto())
+}
+
+listarUsuarios()
+listarMultipla()
+listarTexto()
+</script>
+
+</body>
+</html>
