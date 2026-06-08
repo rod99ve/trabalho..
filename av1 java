@@ -1,104 +1,177 @@
+<?php
+$arquivoUsuarios = "usuarios.txt";
+$arquivoMultipla = "perguntas_multipla.txt";
+$arquivoTexto = "perguntas_texto.txt";
+
+if (isset($_POST["cadastrar_usuario"])) {
+    $nome = $_POST["nome"];
+    $email = $_POST["email"];
+    $senha = $_POST["senha"];
+    file_put_contents($arquivoUsuarios, "$nome;$email;$senha\n", FILE_APPEND);
+    echo "sucesso"; 
+    exit;
+}
+
+if (isset($_POST["cadastrar_pergunta"])) {
+    $dados = $_POST["pergunta"].";".$_POST["a"].";".$_POST["b"].";".$_POST["c"].";".$_POST["d"].";".$_POST["correta"]."\n";
+    file_put_contents($arquivoMultipla, $dados, FILE_APPEND);
+    echo "sucesso";
+    exit;
+}
+
+if (isset($_POST["cadastrar_texto"])) {
+    $dados = $_POST["pergunta_texto"].";".$_POST["resposta_texto"]."\n";
+    file_put_contents($arquivoTexto, $dados, FILE_APPEND);
+    echo "sucesso";
+    exit;
+}
+
+if (isset($_GET["excluir_usuario"])) {
+    $id = $_GET["excluir_usuario"];
+    $linhas = file($arquivoUsuarios);
+    unset($linhas[$id]);
+    file_put_contents($arquivoUsuarios, $linhas);
+    echo "sucesso";
+    exit;
+}
+
+if (isset($_GET["excluir_multipla"])) {
+    $id = $_GET["excluir_multipla"];
+    $linhas = file($arquivoMultipla);
+    unset($linhas[$id]);
+    file_put_contents($arquivoMultipla, $linhas);
+    echo "sucesso";
+    exit;
+}
+
+if (isset($_GET["excluir_texto"])) {
+    $id = $_GET["excluir_texto"];
+    $linhas = file($arquivoTexto);
+    unset($linhas[$id]);
+    file_put_contents($arquivoTexto, $linhas);
+    echo "sucesso";
+    exit;
+}
+?>
+
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema Simples</title>
+</head>
 <body>
 
 <h2>Cadastrar Usuário</h2>
-<input id="nome" placeholder="Nome"><br><br>
-<input id="email" placeholder="Email"><br><br>
-<input id="senha" type="password" placeholder="Senha"><br><br>
-<button onclick="cadastrarUsuario()">Cadastrar</button>
+<form onsubmit="enviarFormulario(event, this)">
+    <input type="hidden" name="cadastrar_usuario" value="1">
+    Nome: <input type="text" name="nome" required><br><br>
+    Email: <input type="email" name="email" required><br><br>
+    Senha: <input type="password" name="senha" required><br><br>
+    <input type="submit" value="Cadastrar Usuário">
+</form>
 
-<div id="usuarios"></div>
+<h3>Usuários Cadastrados</h3>
+<?php
+if (file_exists($arquivoUsuarios)) {
+    $linhas = file($arquivoUsuarios);
+    foreach ($linhas as $i => $linha) {
+        $d = explode(";", trim($linha));
+        if (!empty($d[0])) {
+            echo "Nome: $d[0] | Email: $d[1] ";
+            echo "<a href='#' onclick='excluirItem(\"excluir_usuario\", $i)'>Excluir</a><br>";
+        }
+    }
+}
+?>
 
 <hr>
 
-<h2>Cadastrar Pergunta Múltipla</h2>
-<input id="p" placeholder="Pergunta"><br>
-<input id="a" placeholder="A"><br>
-<input id="b" placeholder="B"><br>
-<input id="c" placeholder="C"><br>
-<input id="d" placeholder="D"><br>
-<select id="correta">
-<option>A</option><option>B</option><option>C</option><option>D</option>
-</select><br><br>
-<button onclick="cadastrarMultipla()">Cadastrar</button>
+<h2>Cadastrar Pergunta de Múltipla Escolha</h2>
+<form onsubmit="enviarFormulario(event, this)">
+    <input type="hidden" name="cadastrar_pergunta" value="1">
+    Pergunta:<br> <input type="text" name="pergunta" required><br><br>
+    A: <input type="text" name="a" required><br>
+    B: <input type="text" name="b" required><br>
+    C: <input type="text" name="c" required><br>
+    D: <input type="text" name="d" required><br><br>
+    <select name="correta">
+        <option>A</option>
+        <option>B</option>
+        <option>C</option>
+        <option>D</option>
+    </select><br><br>
+    <input type="submit" value="Cadastrar Pergunta">
+</form>
 
-<div id="multipla"></div>
+<h3>Perguntas de Múltipla Escolha Cadastradas</h3>
+<?php
+if (file_exists($arquivoMultipla)) {
+    $linhas = file($arquivoMultipla);
+    foreach ($linhas as $i => $linha) {
+        $d = explode(";", trim($linha));
+        if (!empty($d[0])) {
+            echo "<b>$d[0]</b><br>A) $d[1] | B) $d[2] | C) $d[3] | D) $d[4] <br> Correta: $d[5] ";
+            echo "<a href='#' onclick='excluirItem(\"excluir_multipla\", $i)'>Excluir</a><br><br>";
+        }
+    }
+}
+?>
 
 <hr>
 
-<h2>Cadastrar Pergunta Texto</h2>
-<input id="pt" placeholder="Pergunta"><br><br>
-<textarea id="rt"></textarea><br><br>
-<button onclick="cadastrarTexto()">Cadastrar</button>
+<h2>Cadastrar Pergunta de Texto</h2>
+<form onsubmit="enviarFormulario(event, this)">
+    <input type="hidden" name="cadastrar_texto" value="1">
+    Pergunta:<br> <input type="text" name="pergunta_texto" required><br><br>
+    Resposta:<br> <textarea name="resposta_texto" required></textarea><br><br>
+    <input type="submit" value="Cadastrar Pergunta Texto">
+</form>
 
-<div id="texto"></div>
+<h3>Perguntas de Texto Cadastradas</h3>
+<?php
+if (file_exists($arquivoTexto)) {
+    $linhas = file($arquivoTexto);
+    foreach ($linhas as $i => $linha) {
+        $d = explode(";", trim($linha));
+        if (!empty($d[0])) {
+            echo "<b>$d[0]</b><br>Resposta: $d[1] ";
+            echo "<a href='#' onclick='excluirItem(\"excluir_texto\", $i)'>Excluir</a><br><br>";
+        }
+    }
+}
+?>
 
 <script>
-function cadastrarUsuario(){
-fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({acao:"cu",n:nome.value,e:email.value,s:senha.value})})
-.then(()=>listarUsuarios())
+function enviarFormulario(event, form) {
+    event.preventDefault();
+    
+    var dados = new FormData(form);
+    var xhr = new XMLHttpRequest();
+    
+    xhr.open("POST", "sistema.php", true);
+    xhr.onload = function() {
+        if (xhr.responseText.trim() === "sucesso") {
+            location.reload();
+        }
+    };
+    xhr.send(dados);
 }
 
-function listarUsuarios(){
-fetch("api.php?acao=lu").then(r=>r.json()).then(d=>{
-usuarios.innerHTML=""
-d.forEach((u,i)=>{
-usuarios.innerHTML+=`${u.n} | ${u.e} <button onclick="excluirUsuario(${i})">X</button><br>`
-})
-})
+function excluirItem(tipoAcao, id) {
+    if (confirm("Tem certeza que deseja excluir?")) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "sistema.php?" + tipoAcao + "=" + id, true); 
+        xhr.onload = function() {
+            if (xhr.responseText.trim() === "sucesso") {
+                location.reload();
+            }
+        };
+        xhr.send();
+    }
 }
-
-function excluirUsuario(i){
-fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({acao:"eu",i:i})}).then(()=>listarUsuarios())
-}
-
-function cadastrarMultipla(){
-fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({acao:"cm",p:p.value,a:a.value,b:b.value,c:c.value,d:d.value,co:correta.value})})
-.then(()=>listarMultipla())
-}
-
-function listarMultipla(){
-fetch("api.php?acao=lm").then(r=>r.json()).then(d=>{
-multipla.innerHTML=""
-d.forEach((q,i)=>{
-multipla.innerHTML+=`${q.p} <button onclick="excluirMultipla(${i})">X</button><br>`
-})
-})
-}
-
-function excluirMultipla(i){
-fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({acao:"em",i:i})}).then(()=>listarMultipla())
-}
-
-function cadastrarTexto(){
-fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({acao:"ct",p:pt.value,r:rt.value})})
-.then(()=>listarTexto())
-}
-
-function listarTexto(){
-fetch("api.php?acao=lt").then(r=>r.json()).then(d=>{
-texto.innerHTML=""
-d.forEach((q,i)=>{
-texto.innerHTML+=`${q.p} <button onclick="excluirTexto(${i})">X</button><br>`
-})
-})
-}
-
-function excluirTexto(i){
-fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({acao:"et",i:i})}).then(()=>listarTexto())
-}
-
-listarUsuarios()
-listarMultipla()
-listarTexto()
 </script>
 
 </body>
 </html>
+
