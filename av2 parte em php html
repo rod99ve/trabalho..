@@ -1,0 +1,323 @@
+<?php
+session_start();
+
+$agendamentos_file = 'agendamentos.json';
+$clientes_file     = 'clientes.json';
+
+function lerJSON($f){ return file_exists($f) ? json_decode(file_get_contents($f),true)??[] : []; }
+function salvarJSON($f,$d){ file_put_contents($f,json_encode($d,JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE)); }
+function initJSON($f){ if(!file_exists($f)) file_put_contents($f,'[]'); }
+
+initJSON($agendamentos_file);
+initJSON($clientes_file);
+
+$action = $_REQUEST['action'] ?? '';
+
+if($action==='login'){
+    $clientes=lerJSON($clientes_file);
+    $ok=false;
+    foreach($clientes as $c){
+        if($c['email']===$_POST['email'] && $c['senha']===md5($_POST['senha'])){
+            $_SESSION['cliente']=$c; $ok=true; break;
+        }
+    }
+    header('Content-Type: application/json');
+    echo json_encode(['sucesso'=>$ok,'mensagem'=>$ok?'OK':'Email ou senha inválidos.']);
+    exit;
+}
+
+if($action==='criar_conta'){
+    $n=$_POST['nome']??''; $e=$_POST['email']??''; $s=$_POST['senha']??'';
+    if(!$n||!$e||!$s){ header('Content-Type: application/json'); echo json_encode(['sucesso'=>false,'mensagem'=>'Preencha tudo.']); exit; }
+    $clientes=lerJSON($clientes_file);
+    foreach($clientes as $c){ if($c['email']===$e){ header('Content-Type: application/json'); echo json_encode(['sucesso'=>false,'mensagem'=>'Email já cadastrado.']); exit; } }
+    $novo=['id'=>uniqid(),'nome'=>$n,'email'=>$e,'senha'=>md5($s)];
+    $clientes[]=$novo; salvarJSON($clientes_file,$clientes);
+    $_SESSION['cliente']=$novo;
+    header('Content-Type: application/json'); echo json_encode(['sucesso'=>true,'mensagem'=>'Conta criada!']); exit;
+}
+
+if($action==='logout'){ session_destroy(); header('Location: index.php'); exit; }
+
+if($action==='agendar'){
+    $ag=['id'=>uniqid('A'),'nome'=>$_POST['nome']??($_SESSION['cliente']['nome']??''),'email'=>$_POST['email']??($_SESSION['cliente']['email']??''),'servico'=>$_POST['servico']??'','data'=>$_POST['data']??'','hora'=>$_POST['hora']??'','status'=>'Pendente','criado'=>date('Y-m-d H:i:s')];
+    $lista=lerJSON($agendamentos_file); $lista[]=$ag; salvarJSON($agendamentos_file,$lista);
+    $_SESSION['agendamento']=$ag;
+    header('Content-Type: application/json'); echo json_encode(['sucesso'=>true,'agendamento'=>$ag]); exit;
+}
+
+if($action==='pagar'){
+    $lista=lerJSON($agendamentos_file);
+    foreach($lista as &$a){ if($a['id']===$_POST['id']){ $a['status']='Pago'; $a['metodo']=$_POST['metodo']??''; } }
+    salvarJSON($agendamentos_file,$lista);
+    header('Content-Type: application/json'); echo json_encode(['sucesso'=>true]); exit;
+}
+
+if($action==='agendamentos'){ header('Content-Type: application/json'); echo json_encode(lerJSON($agendamentos_file)); exit; }
+
+$cli = $_SESSION['cliente'] ?? null;
+?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Espaço Beleza</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:sans-serif;background:#fff;color:#333}
+nav{background:#eee;padding:12px 20px;display:flex;align-items:center;gap:16px}
+nav a{cursor:pointer;text-decoration:none;color:#333;font-size:.9rem}
+nav a:hover{text-decoration:underline}
+nav select{margin-left:auto;padding:4px 8px}
+.pag{display:none;padding:24px 20px;max-width:900px;margin:auto}
+.pag.on{display:block}
+h1{margin-bottom:20px;font-size:1.4rem}
+h2{margin-bottom:12px;font-size:1.1rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.card{border:1px solid #ccc;border-radius:6px;padding:16px}
+label{display:block;margin-bottom:4px;font-size:.9rem;font-weight:600}
+input[type=text],input[type=email],input[type=password],input[type=time],select.inp{width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;margin-bottom:12px;font-size:.9rem}
+.btn{padding:10px 24px;border:none;border-radius:4px;cursor:pointer;font-size:.9rem;background:#555;color:#fff}
+.btn:hover{background:#333}
+.btn-back{background:none;border:none;cursor:pointer;font-size:1.2rem;margin-bottom:12px}
+.msg{font-size:.85rem;margin-top:8px;min-height:18px}
+.ok{color:green}.err{color:red}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;align-items:center;justify-content:center}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:6px;padding:32px;width:360px;position:relative}
+.modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:1.1rem;cursor:pointer}
+.cal{border:1px solid #ccc;border-radius:6px;padding:12px;max-width:240px}
+.cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:.8rem;gap:2px}
+.cal-grid .ds{font-weight:700;padding:3px 0;color:#888}
+.cal-grid .d{padding:5px 3px;cursor:pointer;border-radius:3px}
+.cal-grid .d:hover{background:#eee}
+.cal-grid .d.sel{background:#555;color:#fff}
+.cal-grid .d.off{color:#bbb;cursor:default}
+.pix-box{border:1px solid #ccc;border-radius:6px;padding:16px;max-width:280px;margin-top:12px}
+.pix-code{font-size:.7rem;color:#888;word-break:break-all;margin-top:8px}
+.cartao-form{display:none;margin-top:12px}
+.cartao-form.on{display:block}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+</style>
+</head>
+<body>
+
+<nav>
+  <a onclick="ir('home')">Menu</a>
+  <a onclick="ir('quem')">Quem Somos</a>
+  <a onclick="ir('promo')">Promoções</a>
+  <a onclick="ir('prof')">Profissionais</a>
+  <?php if($cli): ?>
+    <span style="font-size:.85rem">Olá, <?=htmlspecialchars($cli['nome'])?></span>
+    <a href="?action=logout" style="font-size:.85rem">Sair</a>
+  <?php else: ?>
+    <a onclick="abrirLogin()">Entrar</a>
+  <?php endif; ?>
+  <select onchange="trocarIdioma(this.value)">
+    <option value="pt">Português</option>
+    <option value="en">English</option>
+    <option value="es">Español</option>
+  </select>
+</nav>
+
+<!-- HOME -->
+<div id="pag-home" class="pag on">
+  <h1>Bem-vindos ao Espaço Beleza</h1>
+  <p>Seu salão de beleza em Copacabana. Arte, cuidado e inovação em um só lugar.</p>
+  <br>
+  <button class="btn" onclick="ir('servicos')">Agendar</button>
+  <br><br>
+  <hr>
+  <p style="margin-top:12px;font-size:.85rem">EMAIL: salaobeleza@gmail.com | Contato: (21) 96421-9258 | CEP 20230-000</p>
+  <p style="font-size:.85rem"><a onclick="ir('quem')">Quem somos</a> · <a onclick="ir('promo')">Promoções</a> · <a onclick="ir('prof')">Profissionais</a></p>
+</div>
+
+<!-- QUEM SOMOS -->
+<div id="pag-quem" class="pag">
+  <button class="btn-back" onclick="ir('home')">&#8617;</button>
+  <h1>Quem Somos?</h1>
+  <div class="grid2">
+    <div class="card">
+      <h2>Sobre Nós</h2>
+      <p>Bem-vinda ao Beleza &amp; Cia, seu refúgio no coração de Copacabana. Somos um espaço criado para realçar sua beleza natural em ambiente de tranquilidade, profissionalismo e paixão.</p>
+    </div>
+    <div class="card">
+      <h2>Nossa História</h2>
+      <p>Em 2010, Ana Paula transformou sua paixão pela beleza no Beleza &amp; Cia. Com dedicação e atendimento excepcional, o salão cresceu e se tornou referência em Copacabana.</p>
+    </div>
+  </div>
+</div>
+
+<!-- PROMOÇÕES -->
+<div id="pag-promo" class="pag">
+  <button class="btn-back" onclick="ir('home')">&#8617;</button>
+  <h1>Nossas Promoções</h1>
+  <div class="grid3">
+    <div class="card">
+      <h2>Dia de Beleza Completo</h2>
+      <p>Corte + Manicure + Limpeza de Pele<br>~1h45min</p>
+      <p style="margin-top:8px"><s>R$ 270,00</s> → <strong>R$ 229,90</strong></p>
+    </div>
+    <div class="card">
+      <h2>Dupla Perfeita</h2>
+      <p>Manicure + Corte de Cabelo<br>~1h15min</p>
+      <p style="margin-top:8px"><s>R$ 120,00</s> → <strong>R$ 99,90</strong></p>
+    </div>
+    <div class="card">
+      <h2>Renove Olhar e Mãos</h2>
+      <p>Limpeza de Pele + Manicure</p>
+      <p style="margin-top:8px"><s>R$ 190,00</s> → <strong>R$ 164,90</strong></p>
+    </div>
+  </div>
+</div>
+
+<div id="pag-prof" class="pag">
+  <button class="btn-back" onclick="ir('home')">&#8617;</button>
+  <h1>Profissionais</h1>
+  <div class="grid3">
+    <div class="card"><h2>Maria — Cabeleireira</h2><p>Especialista em cortes, escovas e coloração.</p></div>
+    <div class="card"><h2>Joana — Manicure</h2><p>Manicure simples, gel e pedicure.</p></div>
+    <div class="card"><h2>Ana — Esteticista</h2><p>Limpeza de pele, massagens e drenagem linfática.</p></div>
+  </div>
+</div>
+
+
+<div id="pag-servicos" class="pag">
+  <button class="btn-back" onclick="ir('home')">&#8617;</button>
+  <h1>Serviços &amp; Preços</h1>
+  <div class="grid2">
+    <div>
+      <div class="card">
+        <h2>Tabela de Preços</h2>
+        <table style="width:100%;font-size:.9rem">
+          <tr><td>Corte</td><td><strong>R$ 60,00</strong></td></tr>
+          <tr><td>Manicure/Unha</td><td><strong>R$ 54,00</strong></td></tr>
+          <tr><td>Sobrancelha</td><td><strong>R$ 45,00</strong></td></tr>
+          <tr><td>Massagem</td><td><strong>R$ 100,00</strong></td></tr>
+          <tr><td>Limpeza de Pele</td><td><strong>R$ 150,00</strong></td></tr>
+        </table>
+      </div>
+      <br>
+      <p>Confira nossas <a onclick="ir('promo')" style="cursor:pointer;color:blue">Promoções</a>!</p>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Nossos Serviços</h2>
+        <p><strong>Cabelereira (Joice)</strong> — cortes e tendências.</p><br>
+        <p><strong>Sobrancelha/Unhas (Juçara)</strong> — design e manicure.</p><br>
+        <p><strong>Massagem (Renata)</strong> — relaxante e terapêutica.</p>
+      </div>
+    </div>
+  </div>
+  <br>
+  <button class="btn" onclick="ir('agendamento')">Agendar agora</button>
+</div>
+
+<!-- AGENDAMENTO -->
+<div id="pag-agendamento" class="pag">
+  <button class="btn-back" onclick="ir('servicos')">&#8617;</button>
+  <h1>Agendamento</h1>
+
+  <label>Escolha uma data:</label>
+  <div class="cal" id="cal"></div>
+  <input type="hidden" id="data-sel">
+  <br>
+
+  <label>Serviços:</label>
+  <div id="checks" style="margin-bottom:12px">
+    <label><input type="checkbox" value="Corte"> Corte — R$60</label>
+    <label><input type="checkbox" value="Manicure"> Manicure — R$54</label>
+    <label><input type="checkbox" value="Sobrancelha"> Sobrancelha — R$45</label>
+    <label><input type="checkbox" value="Limpeza de Pele"> Limpeza de Pele — R$150</label>
+    <label><input type="checkbox" value="Massagem"> Massagem — R$100</label>
+  </div>
+
+  <label for="hora">Hora:</label>
+  <input type="time" id="hora" style="width:160px;margin-bottom:12px;padding:8px;border:1px solid #ccc;border-radius:4px">
+
+  <?php if(!$cli): ?>
+  <label for="nome-c">Seu nome:</label>
+  <input type="text" id="nome-c" placeholder="Nome completo">
+  <label for="email-c">Seu e-mail:</label>
+  <input type="email" id="email-c" placeholder="email@exemplo.com">
+  <?php endif; ?>
+
+  <div class="msg" id="msg-agd"></div>
+  <button class="btn" onclick="agendar()">Ir para Pagamento</button>
+</div>
+
+<!-- PAGAMENTO -->
+<div id="pag-pagamento" class="pag">
+  <h1>Formas de Pagamento</h1>
+  <p id="resumo-ag" style="margin-bottom:16px;font-size:.9rem"></p>
+
+  <label><input type="radio" name="met" value="pix" checked onchange="metodo('pix')"> Pix</label>
+  <label style="margin-left:16px"><input type="radio" name="met" value="cartao" onchange="metodo('cartao')"> Débito/Crédito</label>
+
+  <div class="pix-box" id="pix-area">
+    <p><strong>Chave Pix:</strong> salaobeleza@gmail.com</p>
+    <svg width="100" height="100" viewBox="0 0 100 100" style="border:2px solid #333;margin-top:8px">
+      <rect width="100" height="100" fill="white"/>
+      <rect x="5" y="5" width="28" height="28" fill="black"/><rect x="9" y="9" width="20" height="20" fill="white"/><rect x="12" y="12" width="14" height="14" fill="black"/>
+      <rect x="67" y="5" width="28" height="28" fill="black"/><rect x="71" y="9" width="20" height="20" fill="white"/><rect x="74" y="12" width="14" height="14" fill="black"/>
+      <rect x="5" y="67" width="28" height="28" fill="black"/><rect x="9" y="71" width="20" height="20" fill="white"/><rect x="12" y="74" width="14" height="14" fill="black"/>
+      <rect x="40" y="5" width="7" height="7" fill="black"/><rect x="40" y="16" width="7" height="7" fill="black"/>
+      <rect x="40" y="40" width="7" height="7" fill="black"/><rect x="51" y="40" width="7" height="7" fill="black"/><rect x="62" y="40" width="7" height="7" fill="black"/>
+      <rect x="40" y="51" width="7" height="7" fill="black"/><rect x="62" y="51" width="7" height="7" fill="black"/>
+      <rect x="40" y="62" width="7" height="7" fill="black"/><rect x="51" y="62" width="7" height="7" fill="black"/>
+      <rect x="73" y="40" width="7" height="7" fill="black"/><rect x="73" y="62" width="7" height="7" fill="black"/>
+      <rect x="84" y="51" width="7" height="7" fill="black"/>
+    </svg>
+    <p class="pix-code">pix</p>
+  </div>
+
+  <div class="cartao-form" id="cartao-area">
+    <label>Número do cartão:</label>
+    <input type="text" id="c-num" placeholder="0000 0000 0000 0000" maxlength="19">
+    <div class="row2">
+      <div><label>Validade:</label><input type="text" id="c-val" placeholder="MM/AA" maxlength="5"></div>
+      <div><label>CVV:</label><input type="text" id="c-cvv" placeholder="123" maxlength="3"></div>
+    </div>
+    <label>Nome no cartão:</label>
+    <input type="text" id="c-nome" placeholder="Como está no cartão">
+  </div>
+
+  <div class="msg" id="msg-pag"></div>
+  <button class="btn" onclick="pagar()">Confirmar Pagamento</button>
+</div>
+
+<div id="pag-conf" class="pag" style="text-align:center">
+  <h1>✅ Agendamento Confirmado!</h1>
+  <p id="txt-conf" style="margin:16px 0"></p>
+  <button class="btn" onclick="ir('home')">Voltar ao início</button>
+</div>
+
+<div class="overlay" id="ov-login">
+  <div class="modal">
+    <button class="modal-close" onclick="fecharLogin()">&#x2715;</button>
+    <div id="t-login">
+      <h2 style="margin-bottom:16px">Entrar</h2>
+      <p style="font-size:.85rem;margin-bottom:16px">Não tem conta? <a onclick="showReg()" style="cursor:pointer;color:blue">Criar conta</a></p>
+      <label>Email:</label><input type="email" id="l-email" placeholder="seu@email.com">
+      <label>Senha:</label><input type="password" id="l-senha" placeholder="••••••">
+      <button class="btn" style="width:100%" onclick="login()">Entrar</button>
+      <div class="msg" id="msg-l"></div>
+    </div>
+    <div id="t-reg" style="display:none">
+      <h2 style="margin-bottom:16px">Criar Conta</h2>
+      <p style="font-size:.85rem;margin-bottom:16px">Já tem conta? <a onclick="showLogin()" style="cursor:pointer;color:blue">Entrar</a></p>
+      <label>Nome:</label><input type="text" id="r-nome" placeholder="Seu nome">
+      <label>Email:</label><input type="email" id="r-email" placeholder="seu@email.com">
+      <label>Senha:</label><input type="password" id="r-senha" placeholder="••••••">
+      <button class="btn" style="width:100%" onclick="registro()">Criar Conta</button>
+      <div class="msg" id="msg-r"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
