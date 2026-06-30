@@ -1,0 +1,75 @@
+<?php
+
+define('DB_HOST', 'localhost');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+define('DB_NAME', 'espaco_beleza');
+
+function conectar() {
+    static $pdo;
+    if ($pdo) {
+        return $pdo;
+    }
+    $pdo = new PDO(
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8",
+        DB_USER,
+        DB_PASS
+    );
+    return $pdo;
+}
+
+function criarTabelas() {
+    $pdo = conectar();
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS clientes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(100),
+        email VARCHAR(100),
+        senha VARCHAR(32)
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS agendamentos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(100),
+        email VARCHAR(100),
+        servico VARCHAR(100),
+        data_agend DATE,
+        hora_agend TIME,
+        status VARCHAR(20)
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pagamentos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        agendamento_id INT,
+        metodo VARCHAR(30)
+    )");
+}
+
+criarTabelas();
+
+function criarCliente($nome, $email, $senha) {
+    $pdo = conectar();
+    $st = $pdo->prepare("INSERT INTO clientes VALUES (0, ?, ?, ?)");
+    $st->execute([$nome, $email, md5($senha)]);
+}
+
+function criarAgendamento($nome, $email, $servico, $data, $hora) {
+    $pdo = conectar();
+    $st = $pdo->prepare(
+        "INSERT INTO agendamentos VALUES (0, ?, ?, ?, ?, ?, 'Pendente')"
+    );
+    $st->execute([$nome, $email, $servico, $data, $hora]);
+}
+
+function listarAgendamentos() {
+    return conectar()->query("SELECT * FROM agendamentos")->fetchAll();
+}
+
+function registrarPagamento($agendamento_id, $metodo) {
+    $pdo = conectar();
+    $st = $pdo->prepare("INSERT INTO pagamentos VALUES (0, ?, ?)");
+    $st->execute([$agendamento_id, $metodo]);
+    $pdo->prepare(
+        "UPDATE agendamentos SET status='Pago' WHERE id=?"
+    )->execute([$agendamento_id]);
+}
