@@ -1,153 +1,194 @@
-
-function ir(pag) {
-    document.querySelectorAll('.pag').forEach(p => p.classList.remove('on'));
-    document.getElementById('pag-' + pag).classList.add('on');
+function ir(p) {
+    var pags = document.querySelectorAll('.pag');
+    var i = 0;
+    while (i < pags.length) {
+        pags[i].classList.remove('on');
+        i = i + 1;
+    }
+    document.getElementById('pag-' + p).classList.add('on');
     window.scrollTo(0, 0);
-    if (pag === 'agendamento') renderCal();
+    if (p === 'agendamento') renderCal();
 }
 
-// --- MODAL LOGIN ---
-function abrirLogin() { document.getElementById('ov-login').classList.add('on'); showLogin(); }
-function fecharLogin() { document.getElementById('ov-login').classList.remove('on'); }
-function showLogin()   { document.getElementById('t-login').style.display='block'; document.getElementById('t-reg').style.display='none'; }
-function showReg()     { document.getElementById('t-login').style.display='none';  document.getElementById('t-reg').style.display='block'; }
+function abrirLogin() {
+    document.getElementById('ov-login').classList.add('on');
+    document.getElementById('t-login').style.display = 'block';
+    document.getElementById('t-reg').style.display = 'none';
+}
 
-document.getElementById('ov-login').addEventListener('click', function(e){ if(e.target===this) fecharLogin(); });
+function fecharLogin() {
+    document.getElementById('ov-login').classList.remove('on');
+}
 
-async function post(action, dados) {
-    const fd = new FormData();
+document.getElementById('ov-login').onclick = function (e) {
+    if (e.target === this) fecharLogin();
+};
+
+function post(action, dados, callback) {
+    var xhr = new XMLHttpRequest();
+    var fd = new FormData();
     fd.append('action', action);
-    Object.entries(dados).forEach(([k,v]) => fd.append(k, v));
-    const r = await fetch('index.php', { method:'POST', body:fd });
-    return r.json();
+
+    var k;
+    for (k in dados) {
+        fd.append(k, dados[k]);
+    }
+
+    xhr.open('POST', 'index.php');
+    xhr.onload = function () {
+        callback(JSON.parse(xhr.responseText));
+    };
+    xhr.send(fd);
 }
 
-async function login() {
-    const r = await post('login', { email: v('l-email'), senha: v('l-senha') });
-    msg('msg-l', r.mensagem, r.sucesso);
-    if (r.sucesso) setTimeout(() => location.reload(), 700);
+function login() {
+    post('login', {
+        email: v('l-email'),
+        senha: v('l-senha')
+    }, function (r) {
+        msg('msg-l', r.mensagem, r.sucesso);
+        if (r.sucesso) setTimeout(function () {
+            location.reload();
+        }, 700);
+    });
 }
 
-async function registro() {
-    if (!v('r-nome')||!v('r-email')||!v('r-senha')) { msg('msg-r','Preencha tudo.',false); return; }
-    const r = await post('criar_conta', { nome: v('r-nome'), email: v('r-email'), senha: v('r-senha') });
-    msg('msg-r', r.mensagem, r.sucesso);
-    if (r.sucesso) setTimeout(() => location.reload(), 700);
+function registro() {
+    if (v('r-nome') === '' || v('r-email') === '' || v('r-senha') === '') {
+        msg('msg-r', 'Preencha tudo.', false);
+        return;
+    }
+
+    post('criar_conta', {
+        nome: v('r-nome'),
+        email: v('r-email'),
+        senha: v('r-senha')
+    }, function (r) {
+        msg('msg-r', r.mensagem, r.sucesso);
+        if (r.sucesso) setTimeout(function () {
+            location.reload();
+        }, 700);
+    });
 }
 
-// --- CALENDÁRIO ---
-const cal = { ano: new Date().getFullYear(), mes: new Date().getMonth(), sel: null };
-const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+var cal = {
+    ano: new Date().getFullYear(),
+    mes: new Date().getMonth(),
+    sel: ''
+};
+
+var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 function renderCal() {
-    const el = document.getElementById('cal');
+    var el = document.getElementById('cal');
     if (!el) return;
-    const { ano, mes, sel } = cal;
-    const hoje = new Date();
-    const pri = new Date(ano, mes, 1).getDay();
-    const tot = new Date(ano, mes+1, 0).getDate();
-    let h = `<div class="cal-head">
-        <button onclick="mudaMes(-1)" style="background:none;border:none;cursor:pointer">&#8249;</button>
-        <strong>${MESES[mes]} ${ano}</strong>
-        <button onclick="mudaMes(1)" style="background:none;border:none;cursor:pointer">&#8250;</button>
-    </div><div class="cal-grid">
-        <div class="ds">D</div><div class="ds">S</div><div class="ds">T</div><div class="ds">Q</div><div class="ds">Q</div><div class="ds">S</div><div class="ds">S</div>`;
-    for (let i=0;i<pri;i++) h+=`<div></div>`;
-    for (let d=1;d<=tot;d++) {
-        const dt=`${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const pass=new Date(ano,mes,d)<new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate());
-        h+=`<div class="d${sel===dt?' sel':''}${pass?' off':''}" ${!pass?`onclick="selDia('${dt}')"`:''}>${d}</div>`;
-    }
-    h+=`</div>`;
-    el.innerHTML=h;
-}
 
-function mudaMes(d){ cal.mes+=d; if(cal.mes<0){cal.mes=11;cal.ano--;} if(cal.mes>11){cal.mes=0;cal.ano++;} renderCal(); }
-function selDia(d){ cal.sel=d; document.getElementById('data-sel').value=d; renderCal(); }
+    var ano = cal.ano;
+    var mes = cal.mes;
+    var hoje = new Date();
+    var pri = new Date(ano, mes, 1).getDay();
+    var tot = new Date(ano, mes + 1, 0).getDate();
+    var h = '';
+    var i = 0;
 
-async function agendar() {
-    const data  = document.getElementById('data-sel').value;
-    const hora  = document.getElementById('hora').value;
-    const checks = [...document.querySelectorAll('#checks input:checked')].map(c=>c.value);
-    if (!data)         { msg('msg-agd','Selecione uma data.',false); return; }
-    if (!hora)         { msg('msg-agd','Informe a hora.',false); return; }
-    if (!checks.length){ msg('msg-agd','Selecione ao menos um serviço.',false); return; }
+    h += '<div><button onclick="mudaMes(-1)">‹</button> ';
+    h += '<strong>' + MESES[mes] + ' ' + ano + '</strong> ';
+    h += '<button onclick="mudaMes(1)">›</button></div>';
+    h += '<div class="cal-grid">';
 
-    const nome  = document.getElementById('nome-c')?.value || '';
-    const email = document.getElementById('email-c')?.value || '';
-
-    // Salva local
-    const local = JSON.parse(localStorage.getItem('eb_agd')||'[]');
-    const novo  = { id:'l'+Date.now(), data, hora, servico:checks.join('+'), nome, email, criado:new Date().toISOString() };
-    local.push(novo); localStorage.setItem('eb_agd', JSON.stringify(local));
-
-    try {
-        const r = await post('agendar', { data, hora, servico:checks.join('+'), nome, email });
-        if (r.sucesso) { sessionStorage.setItem('ag', JSON.stringify(r.agendamento)); }
-    } catch(e) { sessionStorage.setItem('ag', JSON.stringify(novo)); }
-
-    msg('msg-agd','Agendamento salvo!',true);
-    setTimeout(()=>ir('pagamento'),800);
-}
-
-function metodo(m) {
-    document.getElementById('pix-area').style.display   = m==='pix'    ? 'block':'none';
-    document.getElementById('cartao-area').classList.toggle('on', m==='cartao');
-}
-
-
-document.addEventListener('DOMContentLoaded', ()=>{
-    document.getElementById('c-num')?.addEventListener('input', function(){
-        this.value = this.value.replace(/\D/g,'').substring(0,16).replace(/(.{4})/g,'$1 ').trim();
-    });
-    document.getElementById('c-val')?.addEventListener('input', function(){
-        let x=this.value.replace(/\D/g,'').substring(0,4);
-        if(x.length>=3) x=x.substring(0,2)+'/'+x.substring(2);
-        this.value=x;
-    });
-
-    // Resumo na tela de pagamento ao entrar
-    const ag = JSON.parse(sessionStorage.getItem('ag')||'null');
-    const el = document.getElementById('resumo-ag');
-    if(ag && el) el.textContent=`Serviço: ${ag.servico} | Data: ${ag.data} ${ag.hora}`;
-});
-
-async function pagar() {
-    const met = document.querySelector('input[name="met"]:checked')?.value;
-    if (met==='cartao') {
-        if(!v('c-num')||v('c-num').replace(/\s/g,'').length<13){ msg('msg-pag','Número inválido.',false); return; }
-        if(!v('c-val')||!/^\d{2}\/\d{2}$/.test(v('c-val'))){ msg('msg-pag','Validade inválida.',false); return; }
-        if(!v('c-cvv')||v('c-cvv').length<3){ msg('msg-pag','CVV inválido.',false); return; }
-        if(!v('c-nome')){ msg('msg-pag','Informe o nome.',false); return; }
+    while (i < pri) {
+        h += '<div></div>';
+        i = i + 1;
     }
 
-    const ag = JSON.parse(sessionStorage.getItem('ag')||'{}');
-    try { await post('pagar', { id: ag.id||'', metodo: met }); } catch(e){}
+    var d = 1;
+    while (d <= tot) {
+        var dt = ano + '-' + String(mes + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        var pass = new Date(ano, mes, d) < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+        h += '<div class="d' + (cal.sel === dt ? ' sel' : '') + (pass ? ' off' : '') + '"';
+        if (!pass) h += ' onclick="selDia(\'' + dt + '\')"';
+        h += '>' + d + '</div>';
+        d = d + 1;
+    }
 
+    h += '</div>';
+    el.innerHTML = h;
+}
+
+function mudaMes(d) {
+    cal.mes = cal.mes + d;
+    if (cal.mes < 0) {
+        cal.mes = 11;
+        cal.ano = cal.ano - 1;
+    }
+    if (cal.mes > 11) {
+        cal.mes = 0;
+        cal.ano = cal.ano + 1;
+    }
+    renderCal();
+}
+
+function selDia(d) {
+    cal.sel = d;
+    document.getElementById('data-sel').value = d;
+    renderCal();
+}
+
+function agendar() {
+    var data = document.getElementById('data-sel').value;
+    var hora = document.getElementById('hora').value;
+    var checks = document.querySelectorAll('#checks input:checked');
+    var serv = [];
+    var i = 0;
+
+    while (i < checks.length) {
+        serv.push(checks[i].value);
+        i = i + 1;
+    }
+
+    if (data === '' || hora === '' || serv.length === 0) {
+        msg('msg-agd', 'Preencha tudo.', false);
+        return;
+    }
+
+    var novo = {
+        id: 'l' + Date.now(),
+        data: data,
+        hora: hora,
+        servico: serv.join('+')
+    };
+
+    var local = JSON.parse(localStorage.getItem('eb_agd') || '[]');
+    local.push(novo);
+    localStorage.setItem('eb_agd', JSON.stringify(local));
+    sessionStorage.setItem('ag', JSON.stringify(novo));
+
+    post('agendar', novo, function () {});
+
+    msg('msg-agd', 'Agendamento salvo!', true);
+    setTimeout(function () {
+        ir('pagamento');
+    }, 800);
+}
+
+function pagar() {
+    var ag = JSON.parse(sessionStorage.getItem('ag') || '{}');
+    post('pagar', { id: ag.id }, function () {});
     sessionStorage.removeItem('ag');
-    const el = document.getElementById('txt-conf');
-    if(el) el.textContent=`Serviço: ${ag.servico||''} | ${ag.data||''} ${ag.hora||''} | Pagamento via ${met==='pix'?'Pix':'Cartão'} confirmado!`;
+    document.getElementById('txt-conf').textContent =
+        'Serviço: ' + ag.servico + ' | ' + ag.data + ' ' + ag.hora + ' | Pagamento confirmado';
     ir('conf');
 }
 
-const i18n = {
-    en: { Menu:'Menu', 'Quem Somos':'About Us', 'Promoções':'Promotions', 'Profissionais':'Professionals' },
-    es: { Menu:'Menú', 'Quem Somos':'Quiénes Somos', 'Promoções':'Promociones', 'Profissionais':'Profesionales' },
-    pt: {}
-};
-function trocarIdioma(lang) {
-    document.querySelectorAll('nav a').forEach(a => {
-        const orig = a.dataset.orig || a.textContent;
-        a.dataset.orig = orig;
-        a.textContent  = i18n[lang]?.[orig] || orig;
-    });
+function v(id) {
+    var el = document.getElementById(id);
+    if (!el) return '';
+    return el.value.trim();
 }
 
-
-function v(id){ return document.getElementById(id)?.value?.trim()||''; }
-function msg(id, texto, ok){
-    const el=document.getElementById(id);
-    if(!el) return;
-    el.textContent=texto;
-    el.className='msg '+(ok===true?'ok':ok===false?'err':'');
+function msg(id, texto, ok) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = texto;
+    el.className = 'msg ' + (ok ? 'ok' : 'err');
 }
