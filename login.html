@@ -1,28 +1,65 @@
-<div id="ov-login">
+<!DOCTYPE html>
+<html lang="pt-br">
 
-    <div id="t-login">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Espaço Beleza</title>
 
-        <input id="l-email" placeholder="Email"><br>
+    <link rel="stylesheet" href="style.css">
+</head>
 
-        <input id="l-senha"
-               type="password"
-               placeholder="Senha"><br>
+<body>
 
-        <button onclick="login()">
-            Entrar
-        </button>
+<header>
 
-        <div id="msg-l" class="msg"></div>
+    <h1>ESPAÇO BELEZA</h1>
 
-        <hr>
+    <button onclick="location.href='index.html'">
+        Voltar
+    </button>
 
-        <button onclick="document.getElementById('t-login').style.display='none';
-                         document.getElementById('t-reg').style.display='block'">
+</header>
 
-            Criar conta
+<main>
 
-        </button>
+    <h2>Entrar</h2>
 
-    </div>
+    <p>Acesse sua conta.</p>
 
-</div>
+    <label>E-mail</label>
+    <input
+        id="email"
+        type="email"
+        placeholder="Digite seu e-mail"
+    >
+
+    <br><br>
+
+    <label>Senha</label>
+    <input
+        id="senha"
+        type="password"
+        placeholder="Digite sua senha"
+    >
+
+    <br><br>
+
+    <button onclick="login()">
+        Entrar
+    </button>
+
+    <div id="msg-login"></div>
+
+    <br>
+
+    <button onclick="location.href='criar_conta.html'">
+        Criar conta
+    </button>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+</html>
