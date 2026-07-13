@@ -1,33 +1,128 @@
-<div id="pag-agendamento" class="pag">
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendamento - Espaço Beleza</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+
+    <h1>ESPAÇO BELEZA</h1>
+
+    <button onclick="location.href='index.html'">
+        Início
+    </button>
+
+</header>
+
+<main>
+
+    <h2>Agende seu horário</h2>
+
+    <p>Escolha a data, horário e serviço.</p>
 
     <div id="cal"></div>
 
-    <input id="data-sel" readonly><br>
+    <br>
 
-    <input id="hora" type="time"><br>
+    <label>Data</label>
+
+    <input
+        id="data-sel"
+        readonly
+    >
+
+    <br><br>
+
+    <label>Horário</label>
+
+    <input
+        id="hora"
+        type="time"
+    >
+
+    <br><br>
+
+    <label>Nome</label>
+
+    <input
+        id="nome-c"
+        type="text"
+    >
+
+    <br><br>
+
+    <label>E-mail</label>
+
+    <input
+        id="email-c"
+        type="email"
+    >
+
+    <br><br>
+
+    <h3>Serviços</h3>
 
     <div id="checks">
 
         <label>
-            <input type="checkbox" value="Corte">
-            Corte
+            <input
+                type="checkbox"
+                value="Corte - R$ 60"
+            >
+            Corte — R$ 60
         </label>
 
+        <br>
+
         <label>
-            <input type="checkbox" value="Barba">
-            Barba
+            <input
+                type="checkbox"
+                value="Manicure - R$ 54"
+            >
+            Manicure — R$ 54
+        </label>
+
+        <br>
+
+        <label>
+            <input
+                type="checkbox"
+                value="Sobrancelha - R$ 45"
+            >
+            Sobrancelha — R$ 45
+        </label>
+
+        <br>
+
+        <label>
+            <input
+                type="checkbox"
+                value="Limpeza de pele - R$ 150"
+            >
+            Limpeza de pele — R$ 150
         </label>
 
     </div>
 
-    <input id="nome-c" placeholder="Nome"><br>
-
-    <input id="email-c" placeholder="Email"><br>
+    <br>
 
     <button onclick="agendar()">
-        Agendar
+        Continuar
     </button>
 
-    <div id="msg-agd" class="msg"></div>
+    <div id="msg-agd"></div>
 
-</div>
+</main>
+
+<script src="app.js"></script>
+
+</body>
+
+</html>
