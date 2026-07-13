@@ -1,186 +1,212 @@
 <?php
 session_start();
-
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'espaco_beleza');
-
-function conectar() {
-    static $pdo;
-    if ($pdo) return $pdo;
-    $pdo = new PDO(
-        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8",
-        DB_USER,
-        DB_PASS
-    );
-    return $pdo;
-}
-
-function criarTabelas() {
-    $pdo = conectar();
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS clientes (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nome VARCHAR(100),
-        email VARCHAR(100),
-        senha VARCHAR(32)
-    )");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS agendamentos (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nome VARCHAR(100),
-        email VARCHAR(100),
-        servico VARCHAR(100),
-        data_agend DATE,
-        hora_agend TIME,
-        status VARCHAR(20)
-    )");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS pagamentos (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        agendamento_id INT,
-        metodo VARCHAR(30)
-    )");
-}
-
-criarTabelas();
+require_once 'banco.php';
 
 if (isset($_POST['action'])) {
-    header('Content-Type: application/json');
-    $pdo = conectar();
-    $a = $_POST['action'];
+    header('Content-Type: application/json; charset=utf-8');
+    $acao = $_POST['action'];
 
-    if ($a === 'criar_conta') {
-        $st = $pdo->prepare("INSERT INTO clientes VALUES (0,?,?,?)");
-        $st->execute([
-            $_POST['nome'],
-            $_POST['email'],
-            md5($_POST['senha'])
-        ]);
-        echo json_encode(['sucesso'=>true,'mensagem'=>'Conta criada']);
-        exit;
-    }
+    try {
+        if ($acao === 'criar_conta') {
+            $nome = trim($_POST['nome'] ?? '');
+            $email = trim($_POST['email'] ?? '');
+            $senha = $_POST['senha'] ?? '';
 
-    if ($a === 'login') {
-        $st = $pdo->prepare(
-            "SELECT * FROM clientes WHERE email=? AND senha=?"
-        );
-        $st->execute([
-            $_POST['email'],
-            md5($_POST['senha'])
-        ]);
-        $u = $st->fetch();
-        if ($u) {
-            $_SESSION['user'] = $u;
-            echo json_encode(['sucesso'=>true,'mensagem'=>'Login ok']);
-        } else {
-            echo json_encode(['sucesso'=>false,'mensagem'=>'Dados inválidos']);
+            if ($nome === '' || $email === '' || $senha === '') {
+                echo json_encode(['sucesso' => false, 'mensagem' => 'Preencha todos os campos.']);
+                exit;
+            }
+
+            if (buscarCliente($email)) {
+                echo json_encode(['sucesso' => false, 'mensagem' => 'Este e-mail já está cadastrado.']);
+                exit;
+            }
+
+            criarCliente($nome, $email, $senha);
+            echo json_encode(['sucesso' => true, 'mensagem' => 'Conta criada com sucesso!']);
+            exit;
         }
-        exit;
-    }
 
-    if ($a === 'agendar') {
-        $st = $pdo->prepare(
-            "INSERT INTO agendamentos VALUES (0,?,?,?,?,?, 'Pendente')"
-        );
-        $st->execute([
-            $_POST['nome'],
-            $_POST['email'],
-            $_POST['servico'],
-            $_POST['data'],
-            $_POST['hora']
-        ]);
-        echo json_encode(['sucesso'=>true]);
-        exit;
-    }
+        if ($acao === 'login') {
+            $email = trim($_POST['email'] ?? '');
+            $senha = $_POST['senha'] ?? '';
+            $cliente = buscarCliente($email);
 
-    if ($a === 'pagar') {
-        $pdo->prepare(
-            "INSERT INTO pagamentos VALUES (0,?, 'Simulado')"
-        )->execute([$_POST['id']]);
+            if ($cliente && password_verify($senha, $cliente['senha'])) {
+                $_SESSION['user'] = [
+                    'id' => $cliente['id'],
+                    'nome' => $cliente['nome'],
+                    'email' => $cliente['email']
+                ];
 
-        $pdo->prepare(
-            "UPDATE agendamentos SET status='Pago' WHERE id=?"
-        )->execute([$_POST['id']]);
+                echo json_encode(['sucesso' => true, 'mensagem' => 'Login realizado!']);
+            } else {
+                echo json_encode(['sucesso' => false, 'mensagem' => 'E-mail ou senha inválidos.']);
+            }
+            exit;
+        }
 
-        echo json_encode(['sucesso'=>true]);
+        if ($acao === 'agendar') {
+            $nome = trim($_POST['nome'] ?? '');
+            $email = trim($_POST['email'] ?? '');
+            $servico = trim($_POST['servico'] ?? '');
+            $data = trim($_POST['data'] ?? '');
+            $hora = trim($_POST['hora'] ?? '');
+
+            if ($nome === '' || $email === '' || $servico === '' || $data === '' || $hora === '') {
+                echo json_encode(['sucesso' => false, 'mensagem' => 'Preencha todos os dados do agendamento.']);
+                exit;
+            }
+
+            $id = criarAgendamento($nome, $email, $servico, $data, $hora);
+            echo json_encode(['sucesso' => true, 'mensagem' => 'Agendamento salvo!', 'id' => $id]);
+            exit;
+        }
+
+        if ($acao === 'pagar') {
+            $id = intval($_POST['id'] ?? 0);
+            $metodo = trim($_POST['metodo'] ?? 'Pix');
+
+            if ($id <= 0) {
+                echo json_encode(['sucesso' => false, 'mensagem' => 'Agendamento inválido.']);
+                exit;
+            }
+
+            registrarPagamento($id, $metodo);
+            echo json_encode(['sucesso' => true, 'mensagem' => 'Pagamento confirmado!']);
+            exit;
+        }
+    } catch (Exception $e) {
+        echo json_encode(['sucesso' => false, 'mensagem' => 'Não foi possível concluir a operação.']);
         exit;
     }
 }
+
+$usuario = $_SESSION['user'] ?? null;
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Espaço Beleza</title>
 <style>
-body{font-family:Arial;margin:0}
-nav button{margin:5px}
-.pag{display:none;padding:20px}
-.pag.on{display:block}
-.msg.ok{color:green}
-.msg.err{color:red}
-#ov-login{position:fixed;inset:0;background:#0007;display:none}
-#ov-login.on{display:block}
-#t-login,#t-reg{background:#fff;padding:20px;margin:50px auto;width:300px}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
-.cal-grid div{padding:8px;border:1px solid #ccc;text-align:center}
-.cal-grid .off{background:#eee}
-.cal-grid .sel{background:#8cf}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Arial,sans-serif;color:#171717;background:#f7f7f7}button,input,select{font:inherit}button{cursor:pointer}.topo{height:78px;padding:0 7%;display:flex;align-items:center;justify-content:space-between;background:#0d0d0d;color:#fff;position:sticky;top:0;z-index:10}.marca{font-size:25px;font-weight:700;letter-spacing:1px}.menu{display:flex;align-items:center;gap:8px}.menu button{border:0;background:transparent;color:#fff;padding:11px 14px;border-radius:7px}.menu button:hover{background:#292929}.usuario{font-size:14px;color:#ddd}.pag{display:none;min-height:calc(100vh - 78px)}.pag.on{display:block}.hero{min-height:620px;padding:90px 8%;display:flex;align-items:center;background:linear-gradient(90deg,#050505 0%,#171717 60%,#343434 100%);color:#fff}.hero-conteudo{max-width:650px}.tag{display:inline-block;padding:8px 13px;border:1px solid #777;border-radius:20px;font-size:13px;letter-spacing:1px}.hero h1{font-size:64px;line-height:1.05;margin:24px 0 18px}.hero p{font-size:19px;line-height:1.7;color:#d4d4d4;max-width:580px}.btn-principal{margin-top:22px;padding:15px 24px;border:0;border-radius:7px;background:#fff;color:#111;font-weight:700}.btn-principal:hover{background:#ddd}.secao{padding:70px 8%}.secao h2{text-align:center;font-size:36px;margin:0 0 12px}.subtitulo{text-align:center;color:#666;margin-bottom:38px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.card{background:#fff;padding:30px;border:1px solid #e0e0e0;border-radius:12px;box-shadow:0 8px 25px #0000000b}.card-numero{font-size:35px;font-weight:700;color:#bdbdbd}.card h3{font-size:22px;margin:18px 0 10px}.card p{color:#666;line-height:1.6}.chamada{padding:65px 8%;text-align:center;background:#151515;color:#fff}.chamada h2{font-size:38px;margin:0 0 12px}.chamada p{color:#ccc}.rodape{padding:28px;text-align:center;background:#070707;color:#aaa}.form-area{max-width:920px;margin:50px auto;padding:0 20px}.painel{background:#fff;border:1px solid #ddd;border-radius:12px;padding:30px;box-shadow:0 10px 30px #0000000c}.painel h2{margin-top:0}.grid-form{display:grid;grid-template-columns:1fr 1fr;gap:18px}.campo{display:flex;flex-direction:column;gap:7px}.campo input,.campo select{padding:13px;border:1px solid #ccc;border-radius:7px}.servicos{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:18px 0}.servicos label{padding:13px;border:1px solid #ddd;border-radius:7px;background:#fafafa}.cal-topo{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:15px}.cal-topo button{border:0;background:#111;color:#fff;border-radius:5px;padding:7px 12px}.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:18px}.cal-grid div{padding:12px 5px;border:1px solid #ddd;text-align:center;border-radius:5px}.cal-grid .d{cursor:pointer}.cal-grid .d:hover{background:#eee}.cal-grid .off{background:#eee;color:#aaa;cursor:default}.cal-grid .sel{background:#111;color:#fff}.msg{margin-top:14px;font-weight:700}.msg.ok{color:#16813b}.msg.err{color:#b42318}.pagamento-opcoes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}.pagamento-opcoes label{padding:18px;border:1px solid #ddd;border-radius:8px}.resumo{padding:18px;background:#f3f3f3;border-radius:8px;line-height:1.8}.confirmacao{text-align:center;padding:70px 20px}.confirmacao .icone{font-size:70px}.confirmacao h2{font-size:35px}#ov-login{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:30;padding:20px}#ov-login.on{display:flex}.modal{background:#fff;padding:30px;border-radius:12px;width:100%;max-width:380px;position:relative}.modal h2{margin-top:0}.modal input{width:100%;padding:13px;margin-bottom:11px;border:1px solid #ccc;border-radius:7px}.modal button{width:100%;padding:12px;border:0;border-radius:7px;background:#111;color:#fff;margin-top:5px}.modal .secundario{background:#eee;color:#111}.fechar{position:absolute;right:15px;top:12px;font-size:24px;cursor:pointer}@media(max-width:780px){.menu button:nth-child(2){display:none}.hero h1{font-size:43px}.cards,.grid-form,.pagamento-opcoes{grid-template-columns:1fr}.servicos{grid-template-columns:1fr}.topo{padding:0 4%}.hero{padding:70px 7%}}
 </style>
 </head>
 <body>
+<header class="topo">
+    <div class="marca">ESPAÇO BELEZA</div>
+    <nav class="menu">
+        <button onclick="ir('home')">Início</button>
+        <button onclick="document.getElementById('servicos-home').scrollIntoView()">Serviços</button>
+        <button onclick="ir('agendamento')">Agendar</button>
+        <?php if ($usuario) { ?>
+            <span class="usuario">Olá, <?= htmlspecialchars($usuario['nome']) ?></span>
+        <?php } else { ?>
+            <button onclick="abrirLogin()">Entrar</button>
+        <?php } ?>
+    </nav>
+</header>
 
-<nav>
-<button onclick="ir('home')">Home</button>
-<button onclick="ir('agendamento')">Agendar</button>
-<button onclick="abrirLogin()">Login</button>
-</nav>
+<main id="pag-home" class="pag on">
+    <section class="hero">
+        <div class="hero-conteudo">
+            <span class="tag">BELEZA • CUIDADO • BEM-ESTAR</span>
+            <h1>Realce sua beleza, renove sua confiança.</h1>
+            <p>Um espaço criado para cuidar de você com atendimento profissional, conforto e serviços de qualidade.</p>
+            <button class="btn-principal" onclick="ir('agendamento')">Agendar horário</button>
+        </div>
+    </section>
 
-<div id="pag-home" class="pag on">
-<h2>Bem-vindo ao Espaço Beleza</h2>
-</div>
+    <section id="servicos-home" class="secao">
+        <h2>Nossos serviços</h2>
+        <p class="subtitulo">Escolha o cuidado que combina com você.</p>
+        <div class="cards">
+            <article class="card"><div class="card-numero">01</div><h3>Cabelo</h3><p>Cortes, escova, hidratação e tratamentos para valorizar seu estilo.</p></article>
+            <article class="card"><div class="card-numero">02</div><h3>Unhas</h3><p>Manicure e pedicure com cuidado, higiene e acabamento impecável.</p></article>
+            <article class="card"><div class="card-numero">03</div><h3>Estética</h3><p>Sobrancelha, limpeza de pele e massagens para seu bem-estar.</p></article>
+        </div>
+    </section>
 
-<div id="pag-agendamento" class="pag">
-<div id="cal"></div>
-<input id="data-sel" readonly><br>
-<input id="hora" type="time"><br>
-<div id="checks">
-<label><input type="checkbox" value="Corte"> Corte</label>
-<label><input type="checkbox" value="Barba"> Barba</label>
-</div>
-<input id="nome-c" placeholder="Nome"><br>
-<input id="email-c" placeholder="Email"><br>
-<button onclick="agendar()">Agendar</button>
-<div id="msg-agd" class="msg"></div>
-</div>
+    <section class="chamada">
+        <h2>Seu momento começa aqui.</h2>
+        <p>Escolha uma data, selecione seus serviços e faça seu agendamento.</p>
+        <button class="btn-principal" onclick="ir('agendamento')">Agendar agora</button>
+    </section>
+    <footer class="rodape">© 2026 Espaço Beleza</footer>
+</main>
 
-<div id="pagamento" class="pag">
-<button onclick="pagar()">Confirmar Pagamento</button>
-</div>
+<section id="pag-agendamento" class="pag">
+    <div class="form-area">
+        <div class="painel">
+            <h2>Agende seu horário</h2>
+            <p>Selecione o dia, horário e os serviços desejados.</p>
+            <div id="cal"></div>
+            <div class="grid-form">
+                <div class="campo"><label>Data escolhida</label><input id="data-sel" readonly placeholder="Selecione no calendário"></div>
+                <div class="campo"><label>Horário</label><input id="hora" type="time"></div>
+                <div class="campo"><label>Nome</label><input id="nome-c" value="<?= htmlspecialchars($usuario['nome'] ?? '') ?>" placeholder="Seu nome"></div>
+                <div class="campo"><label>E-mail</label><input id="email-c" value="<?= htmlspecialchars($usuario['email'] ?? '') ?>" placeholder="Seu e-mail"></div>
+            </div>
+            <h3>Serviços</h3>
+            <div id="checks" class="servicos">
+                <label><input type="checkbox" value="Corte - R$ 60"> Corte — R$ 60</label>
+                <label><input type="checkbox" value="Manicure - R$ 54"> Manicure — R$ 54</label>
+                <label><input type="checkbox" value="Sobrancelha - R$ 45"> Sobrancelha — R$ 45</label>
+                <label><input type="checkbox" value="Limpeza de pele - R$ 150"> Limpeza de pele — R$ 150</label>
+            </div>
+            <button class="btn-principal" onclick="agendar()">Continuar</button>
+            <div id="msg-agd" class="msg"></div>
+        </div>
+    </div>
+</section>
 
-<div id="conf" class="pag">
-<p id="txt-conf"></p>
-</div>
+<section id="pag-pagamento" class="pag">
+    <div class="form-area">
+        <div class="painel">
+            <h2>Pagamento</h2>
+            <div id="resumo-pagamento" class="resumo"></div>
+            <div class="pagamento-opcoes">
+                <label><input type="radio" name="metodo" value="Pix" checked> Pix</label>
+                <label><input type="radio" name="metodo" value="Cartão"> Cartão</label>
+            </div>
+            <button class="btn-principal" onclick="pagar()">Confirmar pagamento</button>
+            <div id="msg-pag" class="msg"></div>
+        </div>
+    </div>
+</section>
+
+<section id="pag-conf" class="pag">
+    <div class="confirmacao">
+        <div class="icone">✓</div>
+        <h2>Agendamento confirmado!</h2>
+        <p id="txt-conf"></p>
+        <button class="btn-principal" onclick="ir('home')">Voltar ao início</button>
+    </div>
+</section>
 
 <div id="ov-login">
-<div id="t-login">
-<input id="l-email" placeholder="Email"><br>
-<input id="l-senha" type="password" placeholder="Senha"><br>
-<button onclick="login()">Entrar</button>
-<div id="msg-l" class="msg"></div>
-<hr>
-<button onclick="document.getElementById('t-login').style.display='none';document.getElementById('t-reg').style.display='block'">Criar conta</button>
-</div>
+    <div id="t-login" class="modal">
+        <span class="fechar" onclick="fecharLogin()">×</span>
+        <h2>Entrar</h2>
+        <input id="l-email" type="email" placeholder="E-mail">
+        <input id="l-senha" type="password" placeholder="Senha">
+        <button onclick="login()">Entrar</button>
+        <div id="msg-l" class="msg"></div>
+        <button class="secundario" onclick="mostrarRegistro()">Criar conta</button>
+    </div>
 
-<div id="t-reg" style="display:none">
-<input id="r-nome" placeholder="Nome"><br>
-<input id="r-email" placeholder="Email"><br>
-<input id="r-senha" type="password" placeholder="Senha"><br>
-<button onclick="registro()">Cadastrar</button>
-<div id="msg-r" class="msg"></div>
-</div>
+    <div id="t-reg" class="modal" style="display:none">
+        <span class="fechar" onclick="fecharLogin()">×</span>
+        <h2>Criar conta</h2>
+        <input id="r-nome" placeholder="Nome">
+        <input id="r-email" type="email" placeholder="E-mail">
+        <input id="r-senha" type="password" placeholder="Senha">
+        <button onclick="registro()">Cadastrar</button>
+        <div id="msg-r" class="msg"></div>
+        <button class="secundario" onclick="mostrarLogin()">Já tenho conta</button>
+    </div>
 </div>
 
 <script src="app.js"></script>
