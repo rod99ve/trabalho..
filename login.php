@@ -1,39 +1,47 @@
 <?php
+
 session_start();
 
-require_once("banco.php");
+require_once 'banco.php';
 
-header("Content-Type: application/json");
+header('Content-Type: application/json; charset=utf-8');
 
-$pdo = conectar();
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
 
-$st = $pdo->prepare(
-    "SELECT * FROM clientes WHERE email=? AND senha=?"
-);
-
-$st->execute([
-    $_POST["email"],
-    md5($_POST["senha"])
-]);
-
-$u = $st->fetch();
-
-if ($u) {
-
-    $_SESSION["user"] = $u;
-
+if ($email === '' || $senha === '') {
     echo json_encode([
-        "sucesso" => true,
-        "mensagem" => "Login ok"
+        'sucesso' => false,
+        'mensagem' => 'Preencha o e-mail e a senha.'
     ]);
 
+    exit;
 }
-else {
 
+try {
+    $cliente = buscarCliente($email);
+
+    if ($cliente && password_verify($senha, $cliente['senha'])) {
+        $_SESSION['user'] = [
+            'id' => $cliente['id'],
+            'nome' => $cliente['nome'],
+            'email' => $cliente['email']
+        ];
+
+        echo json_encode([
+            'sucesso' => true,
+            'mensagem' => 'Login realizado!'
+        ]);
+    } else {
+        echo json_encode([
+            'sucesso' => false,
+            'mensagem' => 'E-mail ou senha inválidos.'
+        ]);
+    }
+} catch (Exception $e) {
     echo json_encode([
-        "sucesso" => false,
-        "mensagem" => "Dados inválidos"
+        'sucesso' => false,
+        'mensagem' => 'Não foi possível realizar o login.'
     ]);
-
 }
 ?>
