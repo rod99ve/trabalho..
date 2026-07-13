@@ -1,13 +1,69 @@
-<div id="pagamento" class="pag">
+<!DOCTYPE html>
+<html lang="pt-br">
 
-    <button onclick="pagar()">
-        Confirmar Pagamento
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagamento - Espaço Beleza</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+
+    <h1>ESPAÇO BELEZA</h1>
+
+    <button onclick="location.href='index.html'">
+        Início
     </button>
 
-</div>
+</header>
 
-<div id="conf" class="pag">
+<main>
 
-    <p id="txt-conf"></p>
+    <h2>Pagamento</h2>
 
-</div>
+    <div id="resumo-pagamento"></div>
+
+    <br>
+
+    <h3>Forma de pagamento</h3>
+
+    <label>
+        <input
+            type="radio"
+            name="metodo"
+            value="Pix"
+            checked
+        >
+        Pix
+    </label>
+
+    <br>
+
+    <label>
+        <input
+            type="radio"
+            name="metodo"
+            value="Cartão"
+        >
+        Cartão
+    </label>
+
+    <br><br>
+
+    <button onclick="pagar()">
+        Confirmar pagamento
+    </button>
+
+    <div id="msg-pag"></div>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+
+</html>
