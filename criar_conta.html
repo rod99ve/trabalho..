@@ -1,15 +1,74 @@
-<div id="t-reg" style="display:none">
+<!DOCTYPE html>
+<html lang="pt-br">
 
-    <input id="r-nome" placeholder="Nome"><br>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar Conta - Espaço Beleza</title>
 
-    <input id="r-email" placeholder="Email"><br>
+    <link rel="stylesheet" href="style.css">
+</head>
 
-    <input id="r-senha" type="password" placeholder="Senha"><br>
+<body>
 
-    <button onclick="registro()">
+<header>
+
+    <h1>ESPAÇO BELEZA</h1>
+
+    <button onclick="location.href='login.html'">
+        Voltar
+    </button>
+
+</header>
+
+<main>
+
+    <h2>Criar Conta</h2>
+
+    <p>Preencha os dados abaixo.</p>
+
+    <label>Nome</label>
+    <input
+        id="nome"
+        type="text"
+        placeholder="Digite seu nome"
+    >
+
+    <br><br>
+
+    <label>E-mail</label>
+    <input
+        id="email"
+        type="email"
+        placeholder="Digite seu e-mail"
+    >
+
+    <br><br>
+
+    <label>Senha</label>
+    <input
+        id="senha"
+        type="password"
+        placeholder="Digite sua senha"
+    >
+
+    <br><br>
+
+    <button onclick="criarConta()">
         Cadastrar
     </button>
 
-    <div id="msg-r" class="msg"></div>
+    <div id="msg-registro"></div>
 
-</div>
+    <br>
+
+    <button onclick="location.href='login.html'">
+        Já tenho conta
+    </button>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+</html>
