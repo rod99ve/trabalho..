@@ -1,23 +1,39 @@
 <?php
-require_once("banco.php");
 
-header("Content-Type: application/json");
+session_start();
 
-$pdo = conectar();
+require_once "banco.php";
 
-$pdo->prepare(
-    "INSERT INTO pagamentos VALUES (0, ?, 'Simulado')"
-)->execute([
-    $_POST["id"]
-]);
+header("Content-Type: application/json; charset=utf-8");
 
-$pdo->prepare(
-    "UPDATE agendamentos SET status='Pago' WHERE id=?"
-)->execute([
-    $_POST["id"]
-]);
+$id = intval($_POST["id"] ?? 0);
+$metodo = trim($_POST["metodo"] ?? "Pix");
 
-echo json_encode([
-    "sucesso" => true
-]);
+if ($id <= 0) {
+
+    echo json_encode([
+        "sucesso" => false,
+        "mensagem" => "Agendamento inválido."
+    ]);
+
+    exit;
+}
+
+try {
+
+    registrarPagamento($id, $metodo);
+
+    echo json_encode([
+        "sucesso" => true,
+        "mensagem" => "Pagamento confirmado!"
+    ]);
+
+} catch (Exception $e) {
+
+    echo json_encode([
+        "sucesso" => false,
+        "mensagem" => "Erro ao confirmar o pagamento."
+    ]);
+
+}
 ?>
