@@ -1,0 +1,996 @@
+<?php
+session_start();
+
+define('DB_HOST', 'localhost');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+define('DB_NAME', 'espaco_beleza');
+
+function conectar() {
+    static $pdo;
+
+    if ($pdo) {
+        return $pdo;
+    }
+
+    $pdo = new PDO(
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8",
+        DB_USER,
+        DB_PASS
+    );
+
+    return $pdo;
+}
+
+function criarTabelas() {
+    $pdo = conectar();
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS clientes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(100),
+        email VARCHAR(100),
+        senha VARCHAR(32)
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS agendamentos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(100),
+        email VARCHAR(100),
+        servico VARCHAR(100),
+        data_agend DATE,
+        hora_agend TIME,
+        status VARCHAR(20)
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pagamentos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        agendamento_id INT,
+        metodo VARCHAR(30)
+    )");
+}
+
+criarTabelas();
+
+if (isset($_POST['action'])) {
+    header('Content-Type: application/json');
+
+    $pdo = conectar();
+    $a = $_POST['action'];
+
+    if ($a === 'criar_conta') {
+        $st = $pdo->prepare(
+            "INSERT INTO clientes VALUES (0, ?, ?, ?)"
+        );
+
+        $st->execute([
+            $_POST['nome'],
+            $_POST['email'],
+            md5($_POST['senha'])
+        ]);
+
+        echo json_encode([
+            'sucesso' => true,
+            'mensagem' => 'Conta criada'
+        ]);
+
+        exit;
+    }
+
+    if ($a === 'login') {
+        $st = $pdo->prepare(
+            "SELECT * FROM clientes WHERE email = ? AND senha = ?"
+        );
+
+        $st->execute([
+            $_POST['email'],
+            md5($_POST['senha'])
+        ]);
+
+        $u = $st->fetch();
+
+        if ($u) {
+            $_SESSION['user'] = $u;
+
+            echo json_encode([
+                'sucesso' => true,
+                'mensagem' => 'Login realizado'
+            ]);
+        } else {
+            echo json_encode([
+                'sucesso' => false,
+                'mensagem' => 'E-mail ou senha inválidos'
+            ]);
+        }
+
+        exit;
+    }
+
+    if ($a === 'agendar') {
+        $st = $pdo->prepare(
+            "INSERT INTO agendamentos
+            VALUES (0, ?, ?, ?, ?, ?, 'Pendente')"
+        );
+
+        $st->execute([
+            $_POST['nome'],
+            $_POST['email'],
+            $_POST['servico'],
+            $_POST['data'],
+            $_POST['hora']
+        ]);
+
+        echo json_encode([
+            'sucesso' => true
+        ]);
+
+        exit;
+    }
+
+    if ($a === 'pagar') {
+        $pdo->prepare(
+            "INSERT INTO pagamentos VALUES (0, ?, 'Simulado')"
+        )->execute([
+            $_POST['id']
+        ]);
+
+        $pdo->prepare(
+            "UPDATE agendamentos SET status = 'Pago' WHERE id = ?"
+        )->execute([
+            $_POST['id']
+        ]);
+
+        echo json_encode([
+            'sucesso' => true
+        ]);
+
+        exit;
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Espaço Beleza</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #eeeeee;
+            color: #111111;
+        }
+
+        button,
+        input,
+        select {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .site {
+            width: 100%;
+            max-width: 1100px;
+            min-height: 100vh;
+            margin: auto;
+            background: #ffffff;
+            box-shadow: 0 0 20px #00000025;
+        }
+
+        header {
+            min-height: 85px;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 25px;
+            background: #ffffff;
+            border-bottom: 1px solid #d4d4d4;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .logo-icone {
+            width: 53px;
+            height: 53px;
+            border-radius: 50%;
+            background: #111111;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 25px;
+            font-weight: bold;
+        }
+
+        .logo-texto strong {
+            display: block;
+            font-size: 18px;
+        }
+
+        .logo-texto span {
+            font-size: 12px;
+            color: #666666;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 7px;
+        }
+
+        nav button {
+            border: 0;
+            background: transparent;
+            padding: 11px 13px;
+            font-size: 14px;
+            cursor: pointer;
+            color: #111111;
+            border-radius: 5px;
+        }
+
+        nav button:hover {
+            background: #111111;
+            color: #ffffff;
+        }
+
+        .btn-login {
+            border: 1px solid #111111;
+        }
+
+        .pag {
+            display: none;
+        }
+
+        .pag.on {
+            display: block;
+        }
+
+        .hero {
+            min-height: 485px;
+            padding: 65px 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(#00000066, #00000099),
+                linear-gradient(135deg, #eeeeee, #777777);
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            width: 520px;
+            height: 520px;
+            border: 80px solid #ffffff0f;
+            border-radius: 50%;
+            left: -180px;
+            top: -200px;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            width: 430px;
+            height: 430px;
+            border: 70px solid #ffffff0d;
+            border-radius: 50%;
+            right: -140px;
+            bottom: -200px;
+        }
+
+        .hero-conteudo {
+            max-width: 700px;
+            color: #ffffff;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-conteudo span {
+            display: inline-block;
+            margin-bottom: 18px;
+            padding: 7px 15px;
+            border: 1px solid #ffffff;
+            border-radius: 30px;
+            font-size: 13px;
+        }
+
+        .hero-conteudo h1 {
+            margin: 0 0 15px;
+            font-size: 46px;
+        }
+
+        .hero-conteudo p {
+            margin: 0 auto 30px;
+            max-width: 580px;
+            font-size: 17px;
+            line-height: 1.6;
+        }
+
+        .botao-principal {
+            border: 2px solid #ffffff;
+            background: #ffffff;
+            color: #111111;
+            padding: 14px 40px;
+            border-radius: 5px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        .botao-principal:hover {
+            background: transparent;
+            color: #ffffff;
+        }
+
+        .destaques {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            border-bottom: 1px solid #dddddd;
+        }
+
+        .destaque {
+            padding: 27px 20px;
+            text-align: center;
+            border-right: 1px solid #dddddd;
+        }
+
+        .destaque:last-child {
+            border-right: 0;
+        }
+
+        .destaque strong {
+            display: block;
+            margin-bottom: 7px;
+        }
+
+        .destaque span {
+            color: #666666;
+            font-size: 13px;
+        }
+
+        .conteudo {
+            padding: 55px 35px;
+            min-height: 500px;
+        }
+
+        .titulo-pagina {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .titulo-pagina h2 {
+            margin: 0 0 10px;
+            font-size: 32px;
+        }
+
+        .titulo-pagina p {
+            margin: 0;
+            color: #666666;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 22px;
+        }
+
+        .card {
+            padding: 27px;
+            background: #f4f4f4;
+            border: 1px solid #dddddd;
+            border-radius: 8px;
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        .card p {
+            color: #555555;
+            line-height: 1.6;
+        }
+
+        .agendamento-box {
+            width: 100%;
+            max-width: 650px;
+            margin: auto;
+            padding: 30px;
+            background: #f5f5f5;
+            border: 1px solid #cccccc;
+            border-radius: 8px;
+        }
+
+        .agendamento-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 6px 0;
+            border: 1px solid #bbbbbb;
+            border-radius: 5px;
+        }
+
+        #checks {
+            margin: 15px 0;
+            display: flex;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+        #checks label {
+            background: #ffffff;
+            border: 1px solid #cccccc;
+            padding: 10px 14px;
+            border-radius: 5px;
+        }
+
+        #checks input {
+            width: auto;
+            margin-right: 5px;
+        }
+
+        .botao-escuro {
+            width: 100%;
+            border: 0;
+            background: #111111;
+            color: #ffffff;
+            padding: 13px;
+            margin-top: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .botao-escuro:hover {
+            background: #444444;
+        }
+
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin: 15px 0;
+        }
+
+        .cal-grid div {
+            padding: 10px 5px;
+            border: 1px solid #cccccc;
+            text-align: center;
+            background: #ffffff;
+            cursor: pointer;
+        }
+
+        .cal-grid .off {
+            background: #dddddd;
+            color: #999999;
+            cursor: default;
+        }
+
+        .cal-grid .sel {
+            background: #111111;
+            color: #ffffff;
+        }
+
+        .msg {
+            margin-top: 12px;
+            font-size: 14px;
+        }
+
+        .msg.ok {
+            color: #167000;
+        }
+
+        .msg.err {
+            color: #b00000;
+        }
+
+        footer {
+            padding: 30px;
+            background: #111111;
+            color: #ffffff;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+        }
+
+        footer h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+
+        footer p,
+        footer button {
+            font-size: 13px;
+        }
+
+        footer button {
+            display: block;
+            padding: 4px 0;
+            border: 0;
+            background: transparent;
+            color: #ffffff;
+            cursor: pointer;
+        }
+
+        footer button:hover {
+            text-decoration: underline;
+        }
+
+        #ov-login {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            background: #000000aa;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        #ov-login.on {
+            display: flex;
+        }
+
+        #t-login,
+        #t-reg {
+            width: 100%;
+            max-width: 380px;
+            padding: 30px;
+            background: #ffffff;
+            border-radius: 8px;
+        }
+
+        #t-login h2,
+        #t-reg h2 {
+            margin-top: 0;
+        }
+
+        #t-login input,
+        #t-reg input {
+            width: 100%;
+            padding: 12px;
+            margin: 6px 0;
+            border: 1px solid #bbbbbb;
+            border-radius: 5px;
+        }
+
+        .botao-secundario {
+            width: 100%;
+            border: 1px solid #111111;
+            background: #ffffff;
+            padding: 11px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 800px) {
+            header {
+                flex-direction: column;
+            }
+
+            nav {
+                justify-content: center;
+            }
+
+            .hero-conteudo h1 {
+                font-size: 35px;
+            }
+
+            .destaques,
+            .cards,
+            footer {
+                grid-template-columns: 1fr;
+            }
+
+            .destaque {
+                border-right: 0;
+                border-bottom: 1px solid #dddddd;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="site">
+
+    <header>
+        <div class="logo" onclick="ir('home')">
+            <div class="logo-icone">EB</div>
+
+            <div class="logo-texto">
+                <strong>Espaço Beleza</strong>
+                <span>Cuidados e bem-estar</span>
+            </div>
+        </div>
+
+        <nav>
+            <button onclick="ir('home')">Menu principal</button>
+            <button onclick="ir('quem-somos')">Quem somos?</button>
+            <button onclick="ir('promocoes')">Promoções</button>
+            <button onclick="ir('profissionais')">Profissionais</button>
+            <button onclick="ir('agendamento')">Agendar</button>
+            <button class="btn-login" onclick="abrirLogin()">Login</button>
+        </nav>
+    </header>
+
+    <main>
+
+        <section id="pag-home" class="pag on">
+
+            <div class="hero">
+                <div class="hero-conteudo">
+                    <span>Salão de beleza e bem-estar</span>
+
+                    <h1>Bem-vindos ao Espaço Beleza</h1>
+
+                    <p>
+                        Um espaço criado para cuidar de você, com serviços
+                        profissionais, conforto e atendimento de qualidade.
+                    </p>
+
+                    <button
+                        class="botao-principal"
+                        onclick="ir('agendamento')"
+                    >
+                        Agendar horário
+                    </button>
+                </div>
+            </div>
+
+            <div class="destaques">
+                <div class="destaque">
+                    <strong>Atendimento profissional</strong>
+                    <span>Equipe preparada para cuidar de você</span>
+                </div>
+
+                <div class="destaque">
+                    <strong>Agendamento online</strong>
+                    <span>Escolha a data e o horário pelo site</span>
+                </div>
+
+                <div class="destaque">
+                    <strong>Ambiente confortável</strong>
+                    <span>Beleza, cuidado e tranquilidade</span>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="pag-quem-somos" class="pag conteudo">
+
+            <div class="titulo-pagina">
+                <h2>Quem somos?</h2>
+
+                <p>
+                    Conheça um pouco mais sobre o Espaço Beleza.
+                </p>
+            </div>
+
+            <div class="card">
+                <h3>Nosso espaço</h3>
+
+                <p>
+                    O Espaço Beleza foi criado para oferecer serviços de
+                    beleza e bem-estar em um ambiente agradável, organizado
+                    e acolhedor.
+                </p>
+
+                <p>
+                    Nossa missão é proporcionar uma experiência de qualidade,
+                    respeitando as necessidades de cada cliente.
+                </p>
+            </div>
+
+        </section>
+
+        <section id="pag-promocoes" class="pag conteudo">
+
+            <div class="titulo-pagina">
+                <h2>Promoções</h2>
+
+                <p>
+                    Confira algumas ofertas disponíveis.
+                </p>
+            </div>
+
+            <div class="cards">
+                <div class="card">
+                    <h3>Corte + Hidratação</h3>
+                    <p>
+                        Faça seu corte e ganhe desconto na hidratação.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h3>Dia da beleza</h3>
+                    <p>
+                        Pacote especial com diferentes serviços.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h3>Cliente frequente</h3>
+                    <p>
+                        Condições especiais para clientes cadastrados.
+                    </p>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="pag-profissionais" class="pag conteudo">
+
+            <div class="titulo-pagina">
+                <h2>Nossos profissionais</h2>
+
+                <p>
+                    Conheça a equipe do Espaço Beleza.
+                </p>
+            </div>
+
+            <div class="cards">
+                <div class="card">
+                    <h3>Maria</h3>
+                    <p>Cabeleireira e especialista em cortes.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Joana</h3>
+                    <p>Manicure e especialista em cuidados com as unhas.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Ana</h3>
+                    <p>Especialista em estética e bem-estar.</p>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="pag-agendamento" class="pag conteudo">
+
+            <div class="titulo-pagina">
+                <h2>Agendamento</h2>
+
+                <p>
+                    Escolha seu serviço, data e horário.
+                </p>
+            </div>
+
+            <div class="agendamento-box">
+
+                <div id="cal"></div>
+
+                <input
+                    id="data-sel"
+                    type="text"
+                    placeholder="Data selecionada"
+                    readonly
+                >
+
+                <input
+                    id="hora"
+                    type="time"
+                >
+
+                <div id="checks">
+                    <label>
+                        <input type="checkbox" value="Corte">
+                        Corte
+                    </label>
+
+                    <label>
+                        <input type="checkbox" value="Barba">
+                        Barba
+                    </label>
+
+                    <label>
+                        <input type="checkbox" value="Manicure">
+                        Manicure
+                    </label>
+                </div>
+
+                <input
+                    id="nome-c"
+                    type="text"
+                    placeholder="Seu nome"
+                >
+
+                <input
+                    id="email-c"
+                    type="email"
+                    placeholder="Seu e-mail"
+                >
+
+                <button
+                    class="botao-escuro"
+                    onclick="agendar()"
+                >
+                    Confirmar agendamento
+                </button>
+
+                <div id="msg-agd" class="msg"></div>
+
+            </div>
+
+        </section>
+
+        <section id="pag-pagamento" class="pag conteudo">
+
+            <div class="agendamento-box">
+                <h2>Pagamento</h2>
+
+                <p>
+                    Clique abaixo para confirmar o pagamento simulado.
+                </p>
+
+                <button
+                    class="botao-escuro"
+                    onclick="pagar()"
+                >
+                    Confirmar pagamento
+                </button>
+            </div>
+
+        </section>
+
+        <section id="pag-conf" class="pag conteudo">
+
+            <div class="agendamento-box">
+                <h2>Pagamento confirmado</h2>
+
+                <p id="txt-conf"></p>
+
+                <button
+                    class="botao-escuro"
+                    onclick="ir('home')"
+                >
+                    Voltar ao início
+                </button>
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer>
+
+        <div>
+            <h3>Contato</h3>
+            <p>E-mail: salaobeleza@gmail.com</p>
+            <p>Telefone: (21) 96421-9258</p>
+        </div>
+
+        <div>
+            <h3>Navegação</h3>
+
+            <button onclick="ir('quem-somos')">
+                Quem somos?
+            </button>
+
+            <button onclick="ir('promocoes')">
+                Promoções
+            </button>
+
+            <button onclick="ir('profissionais')">
+                Profissionais
+            </button>
+        </div>
+
+        <div>
+            <h3>Localização</h3>
+            <p>Rio de Janeiro - RJ</p>
+            <p>CEP 20230-000</p>
+        </div>
+
+    </footer>
+
+</div>
+
+<div id="ov-login">
+
+    <div id="t-login">
+
+        <h2>Entrar</h2>
+
+        <input
+            id="l-email"
+            type="email"
+            placeholder="E-mail"
+        >
+
+        <input
+            id="l-senha"
+            type="password"
+            placeholder="Senha"
+        >
+
+        <button
+            class="botao-escuro"
+            onclick="login()"
+        >
+            Entrar
+        </button>
+
+        <div id="msg-l" class="msg"></div>
+
+        <hr>
+
+        <button
+            class="botao-secundario"
+            onclick="
+                document.getElementById('t-login').style.display='none';
+                document.getElementById('t-reg').style.display='block';
+            "
+        >
+            Criar uma conta
+        </button>
+
+    </div>
+
+    <div id="t-reg" style="display:none">
+
+        <h2>Criar conta</h2>
+
+        <input
+            id="r-nome"
+            type="text"
+            placeholder="Nome"
+        >
+
+        <input
+            id="r-email"
+            type="email"
+            placeholder="E-mail"
+        >
+
+        <input
+            id="r-senha"
+            type="password"
+            placeholder="Senha"
+        >
+
+        <button
+            class="botao-escuro"
+            onclick="registro()"
+        >
+            Cadastrar
+        </button>
+
+        <div id="msg-r" class="msg"></div>
+
+        <hr>
+
+        <button
+            class="botao-secundario"
+            onclick="
+                document.getElementById('t-reg').style.display='none';
+                document.getElementById('t-login').style.display='block';
+            "
+        >
+            Voltar para o login
+        </button>
+
+    </div>
+
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
