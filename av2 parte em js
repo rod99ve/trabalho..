@@ -1,194 +1,375 @@
-function ir(p) {
-    var pags = document.querySelectorAll('.pag');
+function ir(pagina) {
+    var paginas = document.querySelectorAll('.pag');
     var i = 0;
-    while (i < pags.length) {
-        pags[i].classList.remove('on');
+
+    while (i < paginas.length) {
+        paginas[i].classList.remove('on');
         i = i + 1;
     }
-    document.getElementById('pag-' + p).classList.add('on');
+
+    var paginaEscolhida = document.getElementById('pag-' + pagina);
+
+    if (paginaEscolhida) {
+        paginaEscolhida.classList.add('on');
+    }
+
     window.scrollTo(0, 0);
-    if (p === 'agendamento') renderCal();
+
+    if (pagina === 'agendamento') {
+        renderCal();
+    }
 }
 
 function abrirLogin() {
     document.getElementById('ov-login').classList.add('on');
-    document.getElementById('t-login').style.display = 'block';
-    document.getElementById('t-reg').style.display = 'none';
+    mostrarLogin();
 }
 
 function fecharLogin() {
     document.getElementById('ov-login').classList.remove('on');
 }
 
-document.getElementById('ov-login').onclick = function (e) {
-    if (e.target === this) fecharLogin();
-};
+function mostrarLogin() {
+    document.getElementById('t-login').style.display = 'block';
+    document.getElementById('t-reg').style.display = 'none';
+}
 
-function post(action, dados, callback) {
+function mostrarRegistro() {
+    document.getElementById('t-login').style.display = 'none';
+    document.getElementById('t-reg').style.display = 'block';
+}
+
+var telaLogin = document.getElementById('ov-login');
+
+if (telaLogin) {
+    telaLogin.onclick = function (evento) {
+        if (evento.target === telaLogin) {
+            fecharLogin();
+        }
+    };
+}
+
+function post(acao, dados, callback) {
     var xhr = new XMLHttpRequest();
-    var fd = new FormData();
-    fd.append('action', action);
+    var formulario = new FormData();
+    var campo;
 
-    var k;
-    for (k in dados) {
-        fd.append(k, dados[k]);
+    formulario.append('action', acao);
+
+    for (campo in dados) {
+        formulario.append(campo, dados[campo]);
     }
 
-    xhr.open('POST', 'index.php');
+    xhr.open('POST', 'index.php', true);
+
     xhr.onload = function () {
-        callback(JSON.parse(xhr.responseText));
+        try {
+            var resposta = JSON.parse(xhr.responseText);
+            callback(resposta);
+        } catch (erro) {
+            callback({
+                sucesso: false,
+                mensagem: 'Erro na resposta do servidor.'
+            });
+        }
     };
-    xhr.send(fd);
+
+    xhr.onerror = function () {
+        callback({
+            sucesso: false,
+            mensagem: 'Erro de conexão.'
+        });
+    };
+
+    xhr.send(formulario);
 }
 
 function login() {
+    var email = valor('l-email');
+    var senha = valor('l-senha');
+
+    if (email === '' || senha === '') {
+        mensagem('msg-l', 'Preencha o email e a senha.', false);
+        return;
+    }
+
     post('login', {
-        email: v('l-email'),
-        senha: v('l-senha')
-    }, function (r) {
-        msg('msg-l', r.mensagem, r.sucesso);
-        if (r.sucesso) setTimeout(function () {
-            location.reload();
-        }, 700);
+        email: email,
+        senha: senha
+    }, function (resposta) {
+        mensagem('msg-l', resposta.mensagem, resposta.sucesso);
+
+        if (resposta.sucesso === true) {
+            setTimeout(function () {
+                location.reload();
+            }, 700);
+        }
     });
 }
 
 function registro() {
-    if (v('r-nome') === '' || v('r-email') === '' || v('r-senha') === '') {
-        msg('msg-r', 'Preencha tudo.', false);
+    var nome = valor('r-nome');
+    var email = valor('r-email');
+    var senha = valor('r-senha');
+
+    if (nome === '' || email === '' || senha === '') {
+        mensagem('msg-r', 'Preencha todos os campos.', false);
         return;
     }
 
     post('criar_conta', {
-        nome: v('r-nome'),
-        email: v('r-email'),
-        senha: v('r-senha')
-    }, function (r) {
-        msg('msg-r', r.mensagem, r.sucesso);
-        if (r.sucesso) setTimeout(function () {
-            location.reload();
-        }, 700);
+        nome: nome,
+        email: email,
+        senha: senha
+    }, function (resposta) {
+        mensagem('msg-r', resposta.mensagem, resposta.sucesso);
+
+        if (resposta.sucesso === true) {
+            setTimeout(function () {
+                mostrarLogin();
+            }, 700);
+        }
     });
 }
 
-var cal = {
+var calendario = {
     ano: new Date().getFullYear(),
     mes: new Date().getMonth(),
-    sel: ''
+    selecionado: ''
 };
 
-var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+var meses = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro'
+];
 
 function renderCal() {
-    var el = document.getElementById('cal');
-    if (!el) return;
+    var elemento = document.getElementById('cal');
 
-    var ano = cal.ano;
-    var mes = cal.mes;
+    if (!elemento) {
+        return;
+    }
+
+    var ano = calendario.ano;
+    var mes = calendario.mes;
     var hoje = new Date();
-    var pri = new Date(ano, mes, 1).getDay();
-    var tot = new Date(ano, mes + 1, 0).getDate();
-    var h = '';
+    var primeiroDia = new Date(ano, mes, 1).getDay();
+    var totalDias = new Date(ano, mes + 1, 0).getDate();
+    var html = '';
     var i = 0;
+    var dia = 1;
 
-    h += '<div><button onclick="mudaMes(-1)">‹</button> ';
-    h += '<strong>' + MESES[mes] + ' ' + ano + '</strong> ';
-    h += '<button onclick="mudaMes(1)">›</button></div>';
-    h += '<div class="cal-grid">';
+    html += '<div class="cal-topo">';
+    html += '<button onclick="mudarMes(-1)">‹</button>';
+    html += '<strong>' + meses[mes] + ' ' + ano + '</strong>';
+    html += '<button onclick="mudarMes(1)">›</button>';
+    html += '</div>';
 
-    while (i < pri) {
-        h += '<div></div>';
+    html += '<div class="cal-semana">';
+    html += '<span>Dom</span>';
+    html += '<span>Seg</span>';
+    html += '<span>Ter</span>';
+    html += '<span>Qua</span>';
+    html += '<span>Qui</span>';
+    html += '<span>Sex</span>';
+    html += '<span>Sáb</span>';
+    html += '</div>';
+
+    html += '<div class="cal-grid">';
+
+    while (i < primeiroDia) {
+        html += '<div></div>';
         i = i + 1;
     }
 
-    var d = 1;
-    while (d <= tot) {
-        var dt = ano + '-' + String(mes + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-        var pass = new Date(ano, mes, d) < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-        h += '<div class="d' + (cal.sel === dt ? ' sel' : '') + (pass ? ' off' : '') + '"';
-        if (!pass) h += ' onclick="selDia(\'' + dt + '\')"';
-        h += '>' + d + '</div>';
-        d = d + 1;
+    while (dia <= totalDias) {
+        var data =
+            ano + '-' +
+            String(mes + 1).padStart(2, '0') + '-' +
+            String(dia).padStart(2, '0');
+
+        var dataAtual = new Date(ano, mes, dia);
+
+        var dataHoje = new Date(
+            hoje.getFullYear(),
+            hoje.getMonth(),
+            hoje.getDate()
+        );
+
+        var passou = dataAtual < dataHoje;
+        var classe = 'dia';
+
+        if (calendario.selecionado === data) {
+            classe += ' sel';
+        }
+
+        if (passou === true) {
+            classe += ' off';
+        }
+
+        html += '<div class="' + classe + '"';
+
+        if (passou === false) {
+            html += ' onclick="selecionarDia(\'' + data + '\')"';
+        }
+
+        html += '>' + dia + '</div>';
+
+        dia = dia + 1;
     }
 
-    h += '</div>';
-    el.innerHTML = h;
+    html += '</div>';
+
+    elemento.innerHTML = html;
 }
 
-function mudaMes(d) {
-    cal.mes = cal.mes + d;
-    if (cal.mes < 0) {
-        cal.mes = 11;
-        cal.ano = cal.ano - 1;
+function mudarMes(valorMes) {
+    calendario.mes = calendario.mes + valorMes;
+
+    if (calendario.mes < 0) {
+        calendario.mes = 11;
+        calendario.ano = calendario.ano - 1;
     }
-    if (cal.mes > 11) {
-        cal.mes = 0;
-        cal.ano = cal.ano + 1;
+
+    if (calendario.mes > 11) {
+        calendario.mes = 0;
+        calendario.ano = calendario.ano + 1;
     }
+
     renderCal();
 }
 
-function selDia(d) {
-    cal.sel = d;
-    document.getElementById('data-sel').value = d;
+function selecionarDia(data) {
+    calendario.selecionado = data;
+
+    var campoData = document.getElementById('data-sel');
+
+    if (campoData) {
+        campoData.value = data;
+    }
+
     renderCal();
 }
 
 function agendar() {
-    var data = document.getElementById('data-sel').value;
-    var hora = document.getElementById('hora').value;
-    var checks = document.querySelectorAll('#checks input:checked');
-    var serv = [];
+    var nome = valor('nome-c');
+    var email = valor('email-c');
+    var data = valor('data-sel');
+    var hora = valor('hora');
+    var marcados = document.querySelectorAll('#checks input:checked');
+    var servicos = [];
     var i = 0;
 
-    while (i < checks.length) {
-        serv.push(checks[i].value);
+    while (i < marcados.length) {
+        servicos.push(marcados[i].value);
         i = i + 1;
     }
 
-    if (data === '' || hora === '' || serv.length === 0) {
-        msg('msg-agd', 'Preencha tudo.', false);
+    if (
+        nome === '' ||
+        email === '' ||
+        data === '' ||
+        hora === '' ||
+        servicos.length === 0
+    ) {
+        mensagem('msg-agd', 'Preencha todos os campos.', false);
         return;
     }
 
-    var novo = {
-        id: 'l' + Date.now(),
+    post('agendar', {
+        nome: nome,
+        email: email,
+        servico: servicos.join(', '),
         data: data,
-        hora: hora,
-        servico: serv.join('+')
-    };
+        hora: hora
+    }, function (resposta) {
+        if (resposta.sucesso === true) {
+            sessionStorage.setItem('agendamento_id', resposta.id);
+            sessionStorage.setItem('agendamento_servico', servicos.join(', '));
+            sessionStorage.setItem('agendamento_data', data);
+            sessionStorage.setItem('agendamento_hora', hora);
 
-    var local = JSON.parse(localStorage.getItem('eb_agd') || '[]');
-    local.push(novo);
-    localStorage.setItem('eb_agd', JSON.stringify(local));
-    sessionStorage.setItem('ag', JSON.stringify(novo));
+            mensagem('msg-agd', 'Agendamento realizado!', true);
 
-    post('agendar', novo, function () {});
-
-    msg('msg-agd', 'Agendamento salvo!', true);
-    setTimeout(function () {
-        ir('pagamento');
-    }, 800);
+            setTimeout(function () {
+                ir('pagamento');
+            }, 700);
+        } else {
+            mensagem('msg-agd', resposta.mensagem, false);
+        }
+    });
 }
 
 function pagar() {
-    var ag = JSON.parse(sessionStorage.getItem('ag') || '{}');
-    post('pagar', { id: ag.id }, function () {});
-    sessionStorage.removeItem('ag');
-    document.getElementById('txt-conf').textContent =
-        'Serviço: ' + ag.servico + ' | ' + ag.data + ' ' + ag.hora + ' | Pagamento confirmado';
-    ir('conf');
+    var id = sessionStorage.getItem('agendamento_id');
+
+    if (id === null || id === '') {
+        alert('Nenhum agendamento encontrado.');
+        return;
+    }
+
+    post('pagar', {
+        id: id,
+        metodo: 'Simulado'
+    }, function (resposta) {
+        if (resposta.sucesso === true) {
+            var servico = sessionStorage.getItem('agendamento_servico');
+            var data = sessionStorage.getItem('agendamento_data');
+            var hora = sessionStorage.getItem('agendamento_hora');
+            var texto = document.getElementById('txt-conf');
+
+            if (texto) {
+                texto.textContent =
+                    'Serviço: ' + servico +
+                    ' | Data: ' + data +
+                    ' | Hora: ' + hora +
+                    ' | Pagamento confirmado';
+            }
+
+            sessionStorage.clear();
+            ir('conf');
+        } else {
+            alert('Não foi possível confirmar o pagamento.');
+        }
+    });
 }
 
-function v(id) {
-    var el = document.getElementById(id);
-    if (!el) return '';
-    return el.value.trim();
+function valor(id) {
+    var elemento = document.getElementById(id);
+
+    if (!elemento) {
+        return '';
+    }
+
+    return elemento.value.trim();
 }
 
-function msg(id, texto, ok) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = texto;
-    el.className = 'msg ' + (ok ? 'ok' : 'err');
+function mensagem(id, texto, sucesso) {
+    var elemento = document.getElementById(id);
+
+    if (!elemento) {
+        return;
+    }
+
+    elemento.textContent = texto;
+
+    if (sucesso === true) {
+        elemento.className = 'msg ok';
+    } else {
+        elemento.className = 'msg err';
+    }
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    renderCal();
+});
